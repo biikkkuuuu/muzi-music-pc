@@ -4,16 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,12 +21,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.muzi.desktop.audio.DesktopAudioPlayer
 import com.muzi.desktop.data.LibraryManager
+import com.muzi.desktop.data.UserPlaylist
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.*
 
 enum class LibrarySubView {
-    MAIN, FAVOURITES, HISTORY
+    MAIN, FAVOURITES, DOWNLOADS, HISTORY, PLAYLIST_DETAILS
 }
 
 @Composable
@@ -40,7 +38,54 @@ fun LibraryScreen(
 ) {
     val likedSongs by LibraryManager.likedSongs.collectAsState()
     val historySongs by LibraryManager.historySongs.collectAsState()
+    val playlists by LibraryManager.playlists.collectAsState()
+    val downloadedSongs = remember(likedSongs, historySongs) { LibraryManager.getDownloadedSongs() }
+
     var subView by remember { mutableStateOf(LibrarySubView.MAIN) }
+    var selectedPlaylist by remember { mutableStateOf<UserPlaylist?>(null) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newPlaylistName by remember { mutableStateOf("") }
+
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text("New Playlist", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newPlaylistName,
+                    onValueChange = { newPlaylistName = it },
+                    label = { Text("Playlist Name") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFE50914),
+                        unfocusedBorderColor = Color(0x66FFFFFF)
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newPlaylistName.isNotBlank()) {
+                            LibraryManager.createPlaylist(newPlaylistName)
+                            newPlaylistName = ""
+                            showCreateDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914))
+                ) {
+                    Text("Create", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = Color(0xFF1E1E1E)
+        )
+    }
 
     Column(
         modifier = modifier
@@ -56,14 +101,17 @@ fun LibraryScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Saved",
+                    text = "Library",
                     color = TextPrimary,
-                    fontSize = 24.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold
                 )
+                IconButton(onClick = { showCreateDialog = true }) {
+                    Icon(Icons.Default.Add, "New Playlist", tint = Color.White)
+                }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Big Cards: Favourites, Downloads, History (Desktop-4.png)
             Row(
@@ -76,30 +124,119 @@ fun LibraryScreen(
                     onClick = { subView = LibrarySubView.FAVOURITES }
                 )
                 LibraryCard(
+                    icon = Icons.Default.Download,
+                    title = "Downloads",
+                    subtitle = "${downloadedSongs.size} Offline Songs",
+                    onClick = { subView = LibrarySubView.DOWNLOADS }
+                )
+                LibraryCard(
                     icon = Icons.Default.History,
                     title = "History",
                     subtitle = "${historySongs.size} Songs",
                     onClick = { subView = LibrarySubView.HISTORY }
                 )
             }
-        } else {
-            val title = if (subView == LibrarySubView.FAVOURITES) "Favourites" else "History"
-            val songs = if (subView == LibrarySubView.FAVOURITES) likedSongs else historySongs
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { subView = LibrarySubView.MAIN }) {
-                    Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(36.dp))
+
+            // User Custom Playlists Section
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = title,
+                    text = "Your Playlists (${playlists.size})",
                     color = TextPrimary,
-                    fontSize = 22.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (playlists.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No custom playlists yet. Tap '+' to create one!", color = TextSecondary, fontSize = 14.sp)
+                }
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(playlists) { pl ->
+                        Column(
+                            modifier = Modifier
+                                .width(140.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    selectedPlaylist = pl
+                                    subView = LibrarySubView.PLAYLIST_DETAILS
+                                }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(140.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF222222)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.QueueMusic, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = pl.title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(text = "${pl.songs.size} songs", color = TextSecondary, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Sub-view: Favourites / Downloads / History / Playlist Details
+            val (title, songs) = when (subView) {
+                LibrarySubView.FAVOURITES -> "Favourites" to likedSongs
+                LibrarySubView.DOWNLOADS -> "Downloads (Offline)" to downloadedSongs
+                LibrarySubView.HISTORY -> "History" to historySongs
+                LibrarySubView.PLAYLIST_DETAILS -> (selectedPlaylist?.title ?: "Playlist") to (selectedPlaylist?.songs ?: emptyList())
+                else -> "" to emptyList()
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { subView = LibrarySubView.MAIN }) {
+                        Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = title,
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (songs.isNotEmpty()) {
+                    Button(
+                        onClick = {
+                            DesktopAudioPlayer.playSong(songs.first(), songs)
+                            onSongClick(songs.first())
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Play all", color = TextPrimary, fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             if (songs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -115,7 +252,10 @@ fun LibraryScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { onSongClick(song) }
+                                .clickable {
+                                    DesktopAudioPlayer.playSong(song, songs)
+                                    onSongClick(song)
+                                }
                                 .padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
