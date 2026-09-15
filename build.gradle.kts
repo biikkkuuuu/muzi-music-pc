@@ -37,8 +37,9 @@ dependencies {
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
-    // nanojson standard artifact
-    implementation("com.grack:nanojson:1.9")
+    // Audio Player engine for Windows Desktop (MP3 & Web Audio Streaming)
+    implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
+    implementation("com.googlecode.soundlibs:tritonus-share:0.3.7.4")
     
     // Image Loading in Compose Desktop (Coil 3 Multiplatform)
     implementation("io.coil-kt.coil3:coil-compose:3.1.0")
