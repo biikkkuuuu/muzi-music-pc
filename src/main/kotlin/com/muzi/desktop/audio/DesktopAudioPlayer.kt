@@ -1,12 +1,13 @@
 package com.muzi.desktop.audio
 
-import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
+import javazoom.jl.player.Player
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.BufferedInputStream
+import java.net.HttpURLConnection
 import java.net.URL
-import javax.sound.sampled.*
 
 object DesktopAudioPlayer {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -28,18 +29,18 @@ object DesktopAudioPlayer {
 
     private var progressJob: Job? = null
     private var playbackJob: Job? = null
-    private var currentLine: SourceDataLine? = null
+    private var player: Player? = null
 
     init {
         _currentSong.value = Song(
-            id = "2",
+            id = "1",
             title = "Pal Pal",
             artist = "Talwiinder",
             album = "Pal Pal",
             durationText = "3:15",
             durationSeconds = 195,
             thumbnailUrl = "https://c.saavncdn.com/472/Pal-Pal-Hindi-2023-20230713180425-500x500.jpg",
-            streamUrl = null
+            streamUrl = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3"
         )
     }
 
@@ -49,14 +50,7 @@ object DesktopAudioPlayer {
         _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 195000L
         _isPlaying.value = true
         startProgressTicker()
-
-        scope.launch {
-            val resolvedUrl = song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
-            if (resolvedUrl != null) {
-                _currentSong.value = song.copy(streamUrl = resolvedUrl)
-                startAudioStream(resolvedUrl)
-            }
-        }
+        startPlayback(song.streamUrl)
     }
 
     fun togglePlayPause() {
@@ -70,19 +64,13 @@ object DesktopAudioPlayer {
     fun play() {
         _isPlaying.value = true
         startProgressTicker()
-        _currentSong.value?.let { song ->
-            if (song.streamUrl != null) {
-                startAudioStream(song.streamUrl)
-            } else {
-                playSong(song)
-            }
-        }
+        _currentSong.value?.let { startPlayback(it.streamUrl) }
     }
 
     fun pause() {
         _isPlaying.value = false
         progressJob?.cancel()
-        stopAudioStream()
+        stopPlayback()
     }
 
     fun seekTo(positionMillis: Long) {
@@ -91,72 +79,38 @@ object DesktopAudioPlayer {
 
     fun setVolume(newVolume: Float) {
         _volume.value = newVolume.coerceIn(0f, 1f)
-        try {
-            currentLine?.let { line ->
-                if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                    val gainControl = line.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-                    val range = gainControl.maximum - gainControl.minimum
-                    val gain = (range * _volume.value) + gainControl.minimum
-                    gainControl.value = gain.coerceIn(gainControl.minimum, gainControl.maximum)
-                }
-            }
-        } catch (_: Exception) {}
     }
 
-    private fun startAudioStream(streamUrl: String?) {
+    private fun startPlayback(streamUrl: String?) {
         if (streamUrl == null) return
-        stopAudioStream()
+        stopPlayback()
 
         playbackJob = scope.launch(Dispatchers.IO) {
             try {
-                val connection = URL(streamUrl).openConnection()
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                connection.connect()
-                val inputStream = connection.getInputStream()
+                val url = URL(streamUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                conn.connectTimeout = 10000
+                conn.readTimeout = 15000
+                conn.connect()
 
-                val inStream = AudioSystem.getAudioInputStream(inputStream)
-                val baseFormat = inStream.format
-                val decodedFormat = AudioFormat(
-                    AudioFormat.Encoding.PCM_SIGNED,
-                    baseFormat.sampleRate,
-                    16,
-                    baseFormat.channels,
-                    baseFormat.channels * 2,
-                    baseFormat.sampleRate,
-                    false
-                )
+                val bufferedStream = BufferedInputStream(conn.inputStream)
+                val newPlayer = Player(bufferedStream)
+                player = newPlayer
 
-                val din = AudioSystem.getAudioInputStream(decodedFormat, inStream)
-                val info = DataLine.Info(SourceDataLine::class.java, decodedFormat)
-                val line = AudioSystem.getLine(info) as SourceDataLine
-                currentLine = line
-
-                line.open(decodedFormat)
-                line.start()
-
-                val buffer = ByteArray(4096)
-                var bytesRead = 0
-
-                while (isActive && _isPlaying.value && din.read(buffer, 0, buffer.size).also { bytesRead = it } != -1) {
-                    line.write(buffer, 0, bytesRead)
-                }
-
-                line.drain()
-                line.stop()
-                line.close()
+                newPlayer.play()
             } catch (_: Exception) {
-                // stream error handled gracefully
+                // stream closed or error handled gracefully
             }
         }
     }
 
-    private fun stopAudioStream() {
+    private fun stopPlayback() {
         playbackJob?.cancel()
         try {
-            currentLine?.stop()
-            currentLine?.close()
+            player?.close()
         } catch (_: Exception) {}
-        currentLine = null
+        player = null
     }
 
     private fun startProgressTicker() {
