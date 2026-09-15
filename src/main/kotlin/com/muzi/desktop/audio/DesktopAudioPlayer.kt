@@ -1,5 +1,6 @@
 package com.muzi.desktop.audio
 
+import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
 import javafx.application.Platform
@@ -11,11 +12,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
+enum class RepeatMode {
+    OFF, ALL, ONE
+}
+
 object DesktopAudioPlayer {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong = _currentSong.asStateFlow()
+
+    private val _queue = MutableStateFlow<List<Song>>(emptyList())
+    val queue = _queue.asStateFlow()
+
+    private val _queueIndex = MutableStateFlow(0)
+    val queueIndex = _queueIndex.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
@@ -32,6 +43,12 @@ object DesktopAudioPlayer {
     private val _volume = MutableStateFlow(0.85f)
     val volume = _volume.asStateFlow()
 
+    private val _isShuffle = MutableStateFlow(false)
+    val isShuffle = _isShuffle.asStateFlow()
+
+    private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
+    val repeatMode = _repeatMode.asStateFlow()
+
     private var mediaPlayer: MediaPlayer? = null
     private var isFxInitialized = false
 
@@ -44,12 +61,36 @@ object DesktopAudioPlayer {
         }
     }
 
-    fun playSong(song: Song) {
+    fun playSong(song: Song, newQueue: List<Song>? = null) {
         _currentSong.value = song
         _currentPositionMillis.value = 0L
         _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 220000L
         _isPlaying.value = true
         _isBuffering.value = true
+
+        LibraryManager.addToHistory(song)
+
+        if (newQueue != null && newQueue.isNotEmpty()) {
+            _queue.value = newQueue
+            _queueIndex.value = newQueue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+        } else {
+            val existing = _queue.value
+            val existingIdx = existing.indexOfFirst { it.id == song.id }
+            if (existingIdx != -1) {
+                _queueIndex.value = existingIdx
+            } else {
+                _queue.value = listOf(song)
+                _queueIndex.value = 0
+                // Fetch endless radio queue in background (Muzi Android behavior)
+                scope.launch {
+                    val radioSongs = YouTubeMusicService.fetchRadioQueue(song.id)
+                    if (radioSongs.isNotEmpty()) {
+                        val merged = listOf(song) + radioSongs.filter { it.id != song.id }
+                        _queue.value = merged
+                    }
+                }
+            }
+        }
 
         scope.launch {
             try {
@@ -72,6 +113,65 @@ object DesktopAudioPlayer {
                 _isBuffering.value = false
                 _isPlaying.value = false
             }
+        }
+    }
+
+    fun playSongAt(index: Int) {
+        val q = _queue.value
+        if (index in q.indices) {
+            _queueIndex.value = index
+            playSong(q[index], q)
+        }
+    }
+
+    fun playNext() {
+        val q = _queue.value
+        if (q.isEmpty()) return
+
+        if (_repeatMode.value == RepeatMode.ONE) {
+            seekTo(0)
+            play()
+            return
+        }
+
+        val nextIndex = if (_isShuffle.value) {
+            q.indices.random()
+        } else {
+            _queueIndex.value + 1
+        }
+
+        if (nextIndex in q.indices) {
+            playSongAt(nextIndex)
+        } else if (_repeatMode.value == RepeatMode.ALL && q.isNotEmpty()) {
+            playSongAt(0)
+        } else {
+            _isPlaying.value = false
+        }
+    }
+
+    fun playPrevious() {
+        if (_currentPositionMillis.value > 3000L) {
+            seekTo(0)
+            return
+        }
+
+        val prevIndex = _queueIndex.value - 1
+        if (prevIndex >= 0) {
+            playSongAt(prevIndex)
+        } else {
+            seekTo(0)
+        }
+    }
+
+    fun toggleShuffle() {
+        _isShuffle.value = !_isShuffle.value
+    }
+
+    fun toggleRepeat() {
+        _repeatMode.value = when (_repeatMode.value) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
         }
     }
 
@@ -148,9 +248,9 @@ object DesktopAudioPlayer {
                     _isPlaying.value = true
                 }
 
+                // Autoplay next song from radio queue when current song finishes!
                 player.setOnEndOfMedia {
-                    _isPlaying.value = false
-                    _currentPositionMillis.value = 0L
+                    playNext()
                 }
 
                 player.play()

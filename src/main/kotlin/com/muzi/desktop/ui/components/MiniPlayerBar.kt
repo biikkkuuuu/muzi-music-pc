@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.muzi.desktop.audio.DesktopAudioPlayer
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.PrimaryRed
 import com.muzi.desktop.ui.theme.TextPrimary
@@ -45,7 +46,7 @@ fun MiniPlayerBar(
     ) {
         Row(
             modifier = Modifier
-                .widthIn(max = 500.dp)
+                .widthIn(max = 520.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
                 .background(PrimaryRed)
@@ -62,7 +63,7 @@ fun MiniPlayerBar(
                     model = song.thumbnailUrl,
                     contentDescription = song.title,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(42.dp)
                         .clip(RoundedCornerShape(8.dp))
                 )
                 Spacer(modifier = Modifier.width(12.dp))
@@ -86,7 +87,7 @@ fun MiniPlayerBar(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = {}) {
+                IconButton(onClick = { DesktopAudioPlayer.playPrevious() }) {
                     Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White)
                 }
                 IconButton(onClick = onTogglePlayPause) {
@@ -96,7 +97,7 @@ fun MiniPlayerBar(
                         tint = Color.White
                     )
                 }
-                IconButton(onClick = {}) {
+                IconButton(onClick = { DesktopAudioPlayer.playNext() }) {
                     Icon(Icons.Default.SkipNext, "Next", tint = Color.White)
                 }
             }

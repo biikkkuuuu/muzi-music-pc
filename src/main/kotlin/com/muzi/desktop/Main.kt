@@ -70,7 +70,12 @@ fun main() = application {
                                         currentTab = ScreenTab.PLAYER
                                     }
                                 )
-                                ScreenTab.LIBRARY -> LibraryScreen()
+                                ScreenTab.LIBRARY -> LibraryScreen(
+                                    onSongClick = { song ->
+                                        DesktopAudioPlayer.playSong(song)
+                                        currentTab = ScreenTab.PLAYER
+                                    }
+                                )
                                 ScreenTab.SETTINGS -> HomeScreen(
                                     onSongClick = { song ->
                                         DesktopAudioPlayer.playSong(song)

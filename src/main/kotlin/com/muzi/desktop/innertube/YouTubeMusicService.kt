@@ -4,6 +4,7 @@ import com.music.innertube.NewPipeDownloaderImpl
 import com.music.innertube.NewPipeUtils
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
+import com.music.innertube.models.WatchEndpoint
 import com.muzi.desktop.model.ChartItem
 import com.muzi.desktop.model.Song
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +67,40 @@ object YouTubeMusicService {
             }
         } catch (_: Exception) {}
 
+        emptyList()
+    }
+
+    suspend fun getSearchSuggestions(query: String): List<String> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) return@withContext emptyList()
+        try {
+            val res = YouTube.searchSuggestions(query).getOrNull()
+            return@withContext res?.queries ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    // Auto-Radio Queue for Continuous Endless Playback (Like Muzi Android)
+    suspend fun fetchRadioQueue(videoId: String): List<Song> = withContext(Dispatchers.IO) {
+        try {
+            val res = YouTube.next(WatchEndpoint(videoId = videoId, playlistId = "RDAMVM$videoId")).getOrNull()
+            if (res != null && res.items.isNotEmpty()) {
+                return@withContext res.items.map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = item.artists.joinToString(", ") { it.name },
+                        album = item.album?.name ?: "Single",
+                        durationText = item.duration?.let { "%d:%02d".format(it / 60, it % 60) } ?: "3:30",
+                        durationSeconds = item.duration?.toLong() ?: 210L,
+                        thumbnailUrl = item.thumbnail,
+                        streamUrl = null
+                    )
+                }.distinctBy { it.id }
+            }
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] Error fetching radio queue: ${e.message}")
+        }
         emptyList()
     }
 
