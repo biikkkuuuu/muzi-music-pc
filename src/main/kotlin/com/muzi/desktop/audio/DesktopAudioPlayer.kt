@@ -1,5 +1,6 @@
 package com.muzi.desktop.audio
 
+import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,7 @@ object DesktopAudioPlayer {
     private val _currentPositionMillis = MutableStateFlow(0L)
     val currentPositionMillis = _currentPositionMillis.asStateFlow()
 
-    private val _durationMillis = MutableStateFlow(195000L) // 3:15
+    private val _durationMillis = MutableStateFlow(195000L)
     val durationMillis = _durationMillis.asStateFlow()
 
     private val _volume = MutableStateFlow(0.85f)
@@ -38,7 +39,7 @@ object DesktopAudioPlayer {
             durationText = "3:15",
             durationSeconds = 195,
             thumbnailUrl = "https://c.saavncdn.com/472/Pal-Pal-Hindi-2023-20230713180425-500x500.jpg",
-            streamUrl = "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Sevish_-__nbsp_.mp3"
+            streamUrl = null
         )
     }
 
@@ -48,7 +49,14 @@ object DesktopAudioPlayer {
         _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 195000L
         _isPlaying.value = true
         startProgressTicker()
-        startAudioStream(song.streamUrl)
+
+        scope.launch {
+            val resolvedUrl = song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
+            if (resolvedUrl != null) {
+                _currentSong.value = song.copy(streamUrl = resolvedUrl)
+                startAudioStream(resolvedUrl)
+            }
+        }
     }
 
     fun togglePlayPause() {
@@ -62,7 +70,13 @@ object DesktopAudioPlayer {
     fun play() {
         _isPlaying.value = true
         startProgressTicker()
-        _currentSong.value?.let { startAudioStream(it.streamUrl) }
+        _currentSong.value?.let { song ->
+            if (song.streamUrl != null) {
+                startAudioStream(song.streamUrl)
+            } else {
+                playSong(song)
+            }
+        }
     }
 
     fun pause() {
@@ -130,7 +144,7 @@ object DesktopAudioPlayer {
                 line.drain()
                 line.stop()
                 line.close()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // stream error handled gracefully
             }
         }
