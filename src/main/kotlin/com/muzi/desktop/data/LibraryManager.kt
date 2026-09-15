@@ -14,7 +14,8 @@ import java.io.File
 @Serializable
 data class LibraryData(
     val likedSongs: List<Song> = emptyList(),
-    val historySongs: List<Song> = emptyList()
+    val historySongs: List<Song> = emptyList(),
+    val searchHistory: List<String> = emptyList()
 )
 
 object LibraryManager {
@@ -28,6 +29,9 @@ object LibraryManager {
     private val _historySongs = MutableStateFlow<List<Song>>(emptyList())
     val historySongs = _historySongs.asStateFlow()
 
+    private val _searchHistory = MutableStateFlow<List<String>>(emptyList())
+    val searchHistory = _searchHistory.asStateFlow()
+
     init {
         load()
     }
@@ -39,6 +43,7 @@ object LibraryManager {
                 val data = json.decodeFromString<LibraryData>(content)
                 _likedSongs.value = data.likedSongs
                 _historySongs.value = data.historySongs
+                _searchHistory.value = data.searchHistory
             }
         } catch (e: Exception) {
             println("[LibraryManager] Error loading library: ${e.message}")
@@ -51,7 +56,8 @@ object LibraryManager {
                 storageFile.parentFile?.mkdirs()
                 val data = LibraryData(
                     likedSongs = _likedSongs.value,
-                    historySongs = _historySongs.value
+                    historySongs = _historySongs.value,
+                    searchHistory = _searchHistory.value
                 )
                 storageFile.writeText(json.encodeToString(data))
             } catch (e: Exception) {
@@ -85,6 +91,24 @@ object LibraryManager {
         } else {
             _historySongs.value = current
         }
+        save()
+    }
+
+    fun addSearchQuery(query: String) {
+        if (query.isBlank()) return
+        val current = _searchHistory.value.toMutableList()
+        current.removeAll { it.equals(query, ignoreCase = true) }
+        current.add(0, query.trim())
+        if (current.size > 20) {
+            _searchHistory.value = current.take(20)
+        } else {
+            _searchHistory.value = current
+        }
+        save()
+    }
+
+    fun clearSearchHistory() {
+        _searchHistory.value = emptyList()
         save()
     }
 }
