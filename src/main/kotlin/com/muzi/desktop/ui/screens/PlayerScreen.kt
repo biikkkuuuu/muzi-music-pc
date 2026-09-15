@@ -1,5 +1,7 @@
 package com.muzi.desktop.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +51,13 @@ fun PlayerScreen(
     val isShuffle by DesktopAudioPlayer.isShuffle.collectAsState()
     val repeatMode by DesktopAudioPlayer.repeatMode.collectAsState()
     val likedSongs by LibraryManager.likedSongs.collectAsState()
+    val dynamicThemeColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
+
+    val animatedBgColor by animateColorAsState(
+        targetValue = dynamicThemeColor,
+        animationSpec = tween(700),
+        label = "PlayerDynamicBg"
+    )
 
     val isLiked = currentSong?.let { LibraryManager.isLiked(it.id) } ?: false
 
@@ -83,7 +93,16 @@ fun PlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(PureBlack)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        animatedBgColor.copy(alpha = 0.55f),
+                        animatedBgColor.copy(alpha = 0.15f),
+                        PureBlack,
+                        PureBlack
+                    )
+                )
+            )
             .padding(28.dp)
     ) {
         // Back Button (Top Left)
@@ -187,7 +206,7 @@ fun PlayerScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Seek Progress Bar
+                // Seek Progress Bar (with dynamic accent color)
                 val progress = if (durationMillis > 0) positionMillis.toFloat() / durationMillis.toFloat() else 0f
                 Slider(
                     value = progress.coerceIn(0f, 1f),
@@ -197,7 +216,7 @@ fun PlayerScreen(
                     modifier = Modifier.width(360.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
-                        activeTrackColor = Color.White,
+                        activeTrackColor = animatedBgColor,
                         inactiveTrackColor = Color(0x44FFFFFF)
                     )
                 )
@@ -339,7 +358,7 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isCurrent) Color(0x22FFFFFF) else Color.Transparent)
+                                    .background(if (isCurrent) animatedBgColor.copy(alpha = 0.25f) else Color.Transparent)
                                     .clickable { DesktopAudioPlayer.playSongAt(index) }
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -373,7 +392,7 @@ fun PlayerScreen(
                                     Icon(
                                         Icons.Default.VolumeUp,
                                         contentDescription = "Playing",
-                                        tint = Color.White,
+                                        tint = animatedBgColor,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 } else {

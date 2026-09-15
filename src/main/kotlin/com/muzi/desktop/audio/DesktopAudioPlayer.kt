@@ -1,8 +1,10 @@
 package com.muzi.desktop.audio
 
+import androidx.compose.ui.graphics.Color
 import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
+import com.muzi.desktop.ui.theme.DynamicColorExtractor
 import javafx.application.Platform
 import javafx.scene.media.Media
 import javafx.scene.media.MediaPlayer
@@ -49,6 +51,10 @@ object DesktopAudioPlayer {
     private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
     val repeatMode = _repeatMode.asStateFlow()
 
+    // Dynamic color extracted from album art (Android Muzi signature feature)
+    private val _dynamicThemeColor = MutableStateFlow(Color(0xFFE50914))
+    val dynamicThemeColor = _dynamicThemeColor.asStateFlow()
+
     private var mediaPlayer: MediaPlayer? = null
     private var isFxInitialized = false
 
@@ -69,6 +75,12 @@ object DesktopAudioPlayer {
         _isBuffering.value = true
 
         LibraryManager.addToHistory(song)
+
+        // Dynamically extract album art color
+        scope.launch {
+            val color = DynamicColorExtractor.extractFromUrl(song.thumbnailUrl)
+            _dynamicThemeColor.value = color
+        }
 
         if (newQueue != null && newQueue.isNotEmpty()) {
             _queue.value = newQueue

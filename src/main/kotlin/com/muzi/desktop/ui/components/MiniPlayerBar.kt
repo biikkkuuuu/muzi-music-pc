@@ -1,5 +1,7 @@
 package com.muzi.desktop.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,9 +15,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.muzi.desktop.audio.DesktopAudioPlayer
 import com.muzi.desktop.model.Song
-import com.muzi.desktop.ui.theme.PrimaryRed
 import com.muzi.desktop.ui.theme.TextPrimary
 import com.muzi.desktop.ui.theme.TextSecondary
 
@@ -38,6 +42,13 @@ fun MiniPlayerBar(
 ) {
     if (song == null) return
 
+    val dynamicColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
+    val animatedColor by animateColorAsState(
+        targetValue = dynamicColor,
+        animationSpec = tween(600),
+        label = "MiniPlayerBg"
+    )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -49,7 +60,18 @@ fun MiniPlayerBar(
                 .widthIn(max = 520.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(PrimaryRed)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            animatedColor,
+                            animatedColor.copy(
+                                red = (animatedColor.red * 0.6f).coerceAtLeast(0f),
+                                green = (animatedColor.green * 0.6f).coerceAtLeast(0f),
+                                blue = (animatedColor.blue * 0.6f).coerceAtLeast(0f)
+                            )
+                        )
+                    )
+                )
                 .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
