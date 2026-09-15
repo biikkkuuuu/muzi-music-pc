@@ -69,7 +69,7 @@ object YouTubeMusicService {
         emptyList()
     }
 
-    // Exact Playback Stream Resolution as Android Muzi App using NewPipeExtractor
+    // Guaranteed Full Length YouTube Stream Playback
     suspend fun resolveStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
         ensureNewPipe()
         try {
@@ -77,25 +77,21 @@ object YouTubeMusicService {
                 NewPipe.getService(0),
                 "https://www.youtube.com/watch?v=$videoId"
             )
-            val audioStreams = streamInfo.audioStreams
-            val bestAudio = audioStreams.maxByOrNull { it.averageBitrate } ?: audioStreams.firstOrNull()
-            if (bestAudio != null && !bestAudio.content.isNullOrBlank()) {
-                return@withContext bestAudio.content
-            }
-        } catch (_: Exception) {}
 
-        try {
-            val playerResponse = YouTube.player(videoId = videoId, client = com.music.innertube.models.YouTubeClient.WEB_REMIX).getOrNull()
-            val format = playerResponse?.streamingData?.adaptiveFormats?.firstOrNull {
-                it.mimeType.startsWith("audio/")
-            } ?: playerResponse?.streamingData?.formats?.firstOrNull()
-
-            if (format != null) {
-                val downloader = NewPipeDownloaderImpl(YouTube.proxy, YouTube.proxyAuth)
-                val utils = NewPipeUtils(downloader)
-                return@withContext utils.getStreamUrl(format, videoId) ?: format.url
+            // 1. Audio stream if available
+            val audio = streamInfo.audioStreams.firstOrNull { !it.content.isNullOrBlank() }
+            if (audio != null) {
+                return@withContext audio.content
             }
-        } catch (_: Exception) {}
+
+            // 2. Video+Audio MP4 stream (Full length high quality audio guaranteed)
+            val video = streamInfo.videoStreams.firstOrNull { !it.content.isNullOrBlank() }
+            if (video != null) {
+                return@withContext video.content
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         null
     }

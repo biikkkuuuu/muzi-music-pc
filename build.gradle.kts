@@ -38,11 +38,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.brotli:dec:0.1.2")
     
-    // Exact NewPipeExtractor from Muzi Android app
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.4") {
+    // Exact NewPipeExtractor v0.26.1 from Muzi Android app
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.1") {
         exclude(group = "com.google.protobuf", module = "protobuf-java")
     }
-    implementation("com.grack:nanojson:1.9")
+    implementation("com.github.TeamNewPipe:nanojson:c7a6c1c08d16b6d5ecded34758e6415e07be2166")
     
     // JavaFX Media for native high quality streaming on Windows
     implementation("org.openjfx:javafx-media:21.0.2:win")
@@ -52,6 +52,11 @@ dependencies {
     // Image Loading in Compose Desktop (Coil 3 Multiplatform)
     implementation("io.coil-kt.coil3:coil-compose:3.1.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.1.0")
+}
+
+tasks.register<JavaExec>("runDebugStream") {
+    mainClass.set("com.muzi.desktop.DebugStreamKt")
+    classpath = sourceSets["main"].runtimeClasspath
 }
 
 compose.desktop {
