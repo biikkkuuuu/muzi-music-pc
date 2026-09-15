@@ -9,6 +9,7 @@ import javafx.util.Duration
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
 
 object DesktopAudioPlayer {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -18,6 +19,9 @@ object DesktopAudioPlayer {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
+
+    private val _isBuffering = MutableStateFlow(false)
+    val isBuffering = _isBuffering.asStateFlow()
 
     private val _currentPositionMillis = MutableStateFlow(0L)
     val currentPositionMillis = _currentPositionMillis.asStateFlow()
@@ -45,12 +49,28 @@ object DesktopAudioPlayer {
         _currentPositionMillis.value = 0L
         _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 220000L
         _isPlaying.value = true
+        _isBuffering.value = true
 
         scope.launch {
-            val url = song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
-            if (url != null) {
-                _currentSong.value = song.copy(streamUrl = url)
-                startFxPlayback(url)
+            try {
+                val audioFile = AudioCacheManager.getAudioFile(song.id) {
+                    song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
+                }
+                _isBuffering.value = false
+
+                if (audioFile != null && audioFile.exists()) {
+                    val mediaUri = audioFile.toURI().toString()
+                    _currentSong.value = song.copy(streamUrl = mediaUri)
+                    startFxPlayback(mediaUri)
+                } else {
+                    println("[DesktopAudioPlayer] Failed to obtain audio file for ${song.title}")
+                    _isPlaying.value = false
+                }
+            } catch (e: Exception) {
+                println("[DesktopAudioPlayer] Error in playSong: ${e.message}")
+                e.printStackTrace()
+                _isBuffering.value = false
+                _isPlaying.value = false
             }
         }
     }
@@ -91,17 +111,26 @@ object DesktopAudioPlayer {
         }
     }
 
-    private fun startFxPlayback(streamUrl: String) {
+    private fun startFxPlayback(mediaUri: String) {
         Platform.runLater {
             try {
                 mediaPlayer?.stop()
                 mediaPlayer?.dispose()
 
-                val media = Media(streamUrl)
+                println("[DesktopAudioPlayer] Loading media: $mediaUri")
+                val media = Media(mediaUri)
+                media.setOnError {
+                    println("[DesktopAudioPlayer] Media error: ${media.error?.message}")
+                }
+
                 val player = MediaPlayer(media)
                 mediaPlayer = player
 
                 player.volume = _volume.value.toDouble()
+
+                player.setOnError {
+                    println("[DesktopAudioPlayer] Player error: ${player.error?.message}")
+                }
 
                 player.currentTimeProperty().addListener { _, _, newTime ->
                     _currentPositionMillis.value = newTime.toMillis().toLong()
@@ -113,6 +142,12 @@ object DesktopAudioPlayer {
                     }
                 }
 
+                player.setOnReady {
+                    println("[DesktopAudioPlayer] Player is ready! Duration: ${player.totalDuration.toSeconds()}s")
+                    player.play()
+                    _isPlaying.value = true
+                }
+
                 player.setOnEndOfMedia {
                     _isPlaying.value = false
                     _currentPositionMillis.value = 0L
@@ -121,6 +156,7 @@ object DesktopAudioPlayer {
                 player.play()
                 _isPlaying.value = true
             } catch (e: Exception) {
+                println("[DesktopAudioPlayer] Error starting playback: ${e.message}")
                 e.printStackTrace()
             }
         }

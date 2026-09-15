@@ -78,19 +78,35 @@ object YouTubeMusicService {
                 "https://www.youtube.com/watch?v=$videoId"
             )
 
-            // 1. Audio stream if available
-            val audio = streamInfo.audioStreams.firstOrNull { !it.content.isNullOrBlank() }
-            if (audio != null) {
-                return@withContext audio.content
+            // 1. Audio stream if available (M4A / AAC preferred)
+            val m4aAudio = streamInfo.audioStreams.firstOrNull { it.format?.suffix?.equals("m4a", ignoreCase = true) == true }
+            if (m4aAudio != null && !m4aAudio.content.isNullOrBlank()) {
+                return@withContext m4aAudio.content
             }
 
-            // 2. Video+Audio MP4 stream (Full length high quality audio guaranteed)
-            val video = streamInfo.videoStreams.firstOrNull { !it.content.isNullOrBlank() }
-            if (video != null) {
-                return@withContext video.content
+            val anyAudio = streamInfo.audioStreams.firstOrNull { !it.content.isNullOrBlank() }
+            if (anyAudio != null) {
+                return@withContext anyAudio.content
+            }
+
+            // 2. Video+Audio MP4 stream with sound (itag 18 is 360p MP4 with AAC, fast ~5-8MB)
+            val mp4Medium = streamInfo.videoStreams.firstOrNull { it.itag == 18 && !it.content.isNullOrBlank() }
+            if (mp4Medium != null) {
+                return@withContext mp4Medium.content
+            }
+
+            // 3. Any non-video-only stream (i.e. contains audio)
+            val muxedStream = streamInfo.videoStreams.firstOrNull { !it.isVideoOnly && !it.content.isNullOrBlank() }
+            if (muxedStream != null) {
+                return@withContext muxedStream.content
+            }
+
+            val fallbackVideo = streamInfo.videoStreams.firstOrNull { !it.content.isNullOrBlank() }
+            if (fallbackVideo != null) {
+                return@withContext fallbackVideo.content
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            println("[YouTubeMusicService] Stream resolution error for $videoId: ${e.message}")
         }
 
         null
