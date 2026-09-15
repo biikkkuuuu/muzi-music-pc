@@ -33,7 +33,7 @@ import com.muzi.desktop.model.LyricsLine
 import com.muzi.desktop.ui.theme.*
 
 enum class PlayerSideTab {
-    LYRICS, QUEUE
+    LYRICS, QUEUE, DETAILS
 }
 
 @Composable
@@ -48,6 +48,7 @@ fun PlayerScreen(
     val isBuffering by DesktopAudioPlayer.isBuffering.collectAsState()
     val positionMillis by DesktopAudioPlayer.currentPositionMillis.collectAsState()
     val durationMillis by DesktopAudioPlayer.durationMillis.collectAsState()
+    val volume by DesktopAudioPlayer.volume.collectAsState()
     val isShuffle by DesktopAudioPlayer.isShuffle.collectAsState()
     val repeatMode by DesktopAudioPlayer.repeatMode.collectAsState()
     val likedSongs by LibraryManager.likedSongs.collectAsState()
@@ -121,7 +122,7 @@ fun PlayerScreen(
                 .padding(top = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(48.dp)
         ) {
-            // Left Column (Artwork + Song Info + Controls)
+            // Left Column (Artwork + Song Info + Controls + Volume)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -129,11 +130,11 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Album Art (Desktop-2.png)
+                // Album Art (Desktop-2.png with rounded corners and ambient shadow)
                 Box(
                     modifier = Modifier
-                        .size(360.dp)
-                        .clip(RoundedCornerShape(20.dp))
+                        .size(350.dp)
+                        .clip(RoundedCornerShape(22.dp))
                         .background(SurfaceDark)
                 ) {
                     if (currentSong?.thumbnailUrl?.isNotEmpty() == true) {
@@ -164,7 +165,7 @@ fun PlayerScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Song Title + Like Heart + Artist
                 Row(
@@ -204,7 +205,7 @@ fun PlayerScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Seek Progress Bar (with dynamic accent color)
                 val progress = if (durationMillis > 0) positionMillis.toFloat() / durationMillis.toFloat() else 0f
@@ -230,7 +231,7 @@ fun PlayerScreen(
                     Text(text = formatTime(durationMillis), color = TextSecondary, fontSize = 12.sp)
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Controls: Shuffle, Prev, Play/Pause, Next, Repeat
                 Row(
@@ -277,15 +278,48 @@ fun PlayerScreen(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Volume Slider (Muzi Desktop essential control)
+                Row(
+                    modifier = Modifier.width(340.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (volume > 0.5f) Icons.Default.VolumeUp else if (volume > 0f) Icons.Default.VolumeDown else Icons.Default.VolumeMute,
+                        contentDescription = "Volume",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Slider(
+                        value = volume,
+                        onValueChange = { DesktopAudioPlayer.setVolume(it) },
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.White,
+                            inactiveTrackColor = Color(0x33FFFFFF)
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${(volume * 100).toInt()}%",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.width(32.dp)
+                    )
+                }
             }
 
-            // Right Column (Side Tab: Lyrics vs Up Next / Queue)
+            // Right Column (Side Tab: Lyrics vs Up Next vs Details)
             Column(
                 modifier = Modifier
                     .weight(1.2f)
                     .fillMaxHeight()
             ) {
-                // Tab Switcher (Lyrics / Up Next)
+                // Tab Switcher (Lyrics / Up Next / Song Details)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -303,7 +337,7 @@ fun PlayerScreen(
                             .clickable { sideTab = PlayerSideTab.LYRICS }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "Up Next (${queue.size})",
                         color = if (sideTab == PlayerSideTab.QUEUE) Color.White else Color(0x55FFFFFF),
@@ -314,100 +348,139 @@ fun PlayerScreen(
                             .clickable { sideTab = PlayerSideTab.QUEUE }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Details",
+                        color = if (sideTab == PlayerSideTab.DETAILS) Color.White else Color(0x55FFFFFF),
+                        fontSize = 18.sp,
+                        fontWeight = if (sideTab == PlayerSideTab.DETAILS) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { sideTab = PlayerSideTab.DETAILS }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 }
 
-                if (sideTab == PlayerSideTab.LYRICS) {
-                    // Lyrics View (Desktop-2.png)
-                    if (lyrics.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No lyrics available", color = Color(0x44FFFFFF), fontSize = 16.sp)
-                        }
-                    } else {
-                        LazyColumn(
-                            state = lyricsListState,
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            itemsIndexed(lyrics) { index, line ->
-                                val isActive = index == activeIndex
-                                Text(
-                                    text = line.text,
-                                    color = if (isActive) Color.White else Color(0x55FFFFFF),
-                                    fontSize = if (isActive) 26.sp else 20.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { DesktopAudioPlayer.seekTo(line.timeMillis) }
-                                        .padding(horizontal = 16.dp)
-                                )
+                when (sideTab) {
+                    PlayerSideTab.LYRICS -> {
+                        // Lyrics View (Desktop-2.png)
+                        if (lyrics.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("No lyrics available", color = Color(0x44FFFFFF), fontSize = 16.sp)
+                            }
+                        } else {
+                            LazyColumn(
+                                state = lyricsListState,
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                itemsIndexed(lyrics) { index, line ->
+                                    val isActive = index == activeIndex
+                                    Text(
+                                        text = line.text,
+                                        color = if (isActive) Color.White else Color(0x55FFFFFF),
+                                        fontSize = if (isActive) 26.sp else 20.sp,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { DesktopAudioPlayer.seekTo(line.timeMillis) }
+                                            .padding(horizontal = 16.dp)
+                                    )
+                                }
                             }
                         }
                     }
-                } else {
-                    // Up Next / Queue View (Exact Muzi Android Queue Behavior)
-                    LazyColumn(
-                        state = queueListState,
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        itemsIndexed(queue) { index, item ->
-                            val isCurrent = index == queueIndex
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isCurrent) animatedBgColor.copy(alpha = 0.25f) else Color.Transparent)
-                                    .clickable { DesktopAudioPlayer.playSongAt(index) }
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AsyncImage(
-                                    model = item.thumbnailUrl,
-                                    contentDescription = item.title,
+                    PlayerSideTab.QUEUE -> {
+                        // Up Next / Queue View (Exact Muzi Android Queue Behavior)
+                        LazyColumn(
+                            state = queueListState,
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            itemsIndexed(queue) { index, item ->
+                                val isCurrent = index == queueIndex
+                                Row(
                                     modifier = Modifier
-                                        .size(46.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.title,
-                                        color = if (isCurrent) Color.White else TextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isCurrent) animatedBgColor.copy(alpha = 0.25f) else Color.Transparent)
+                                        .clickable { DesktopAudioPlayer.playSongAt(index) }
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AsyncImage(
+                                        model = item.thumbnailUrl,
+                                        contentDescription = item.title,
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .clip(RoundedCornerShape(6.dp))
                                     )
-                                    Text(
-                                        text = item.artist,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                if (isCurrent) {
-                                    Icon(
-                                        Icons.Default.VolumeUp,
-                                        contentDescription = "Playing",
-                                        tint = animatedBgColor,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                } else {
-                                    Text(
-                                        text = item.durationText,
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.title,
+                                            color = if (isCurrent) Color.White else TextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.artist,
+                                            color = TextSecondary,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (isCurrent) {
+                                        Icon(
+                                            Icons.Default.VolumeUp,
+                                            contentDescription = "Playing",
+                                            tint = animatedBgColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = item.durationText,
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
                             }
+                        }
+                    }
+                    PlayerSideTab.DETAILS -> {
+                        // Song Details View
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(18.dp)
+                        ) {
+                            DetailRow("Song Title", currentSong?.title ?: "Unknown")
+                            DetailRow("Artist", currentSong?.artist ?: "Unknown")
+                            DetailRow("Album", currentSong?.album?.ifEmpty { "Single" } ?: "Single")
+                            DetailRow("Duration", currentSong?.durationText ?: formatTime(durationMillis))
+                            DetailRow("Quality", "128 kbps AAC (High Definition)")
+                            DetailRow("Provider", "YouTube Music (Muzi Native Backend)")
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Column {
+        Text(text = label, color = TextSecondary, fontSize = 13.sp)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(text = value, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -7,6 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,33 +26,55 @@ import com.music.innertube.models.PlaylistItem
 import com.music.innertube.models.SongItem
 import com.music.innertube.pages.HomePage
 import com.muzi.desktop.audio.DesktopAudioPlayer
+import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.ChartItem
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
     onSongClick: (Song) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var homeFeed by remember { mutableStateOf<YouTubeMusicService.HomeFeed?>(null) }
     var charts by remember { mutableStateOf<List<ChartItem>>(emptyList()) }
+    var fallbackQuickPicks by remember { mutableStateOf<List<Song>>(emptyList()) }
     var selectedChip by remember { mutableStateOf<HomePage.Chip?>(null) }
     var isLoadingFeed by remember { mutableStateOf(true) }
+    val historySongs by LibraryManager.historySongs.collectAsState()
+
+    // Default Mood Chips if offline or while loading
+    val defaultMoodChips = listOf(
+        "Feel good", "Romance", "Work out", "Party", "Energise", "Relax", "Commute", "Sad", "Focus", "Sleep", "Podcasts"
+    )
 
     // Load Default Home Feed & Charts on launch
     LaunchedEffect(Unit) {
         charts = YouTubeMusicService.getBrowseCharts()
-        homeFeed = YouTubeMusicService.getHomeFeed()
+        val feed = YouTubeMusicService.getHomeFeed()
+        if (feed != null && feed.sections.isNotEmpty()) {
+            homeFeed = feed
+        } else {
+            fallbackQuickPicks = YouTubeMusicService.getQuickPicks()
+        }
         isLoadingFeed = false
     }
 
     // Load Filtered Feed when mood chip changes
     LaunchedEffect(selectedChip) {
-        isLoadingFeed = true
-        homeFeed = YouTubeMusicService.getHomeFeed(selectedChip?.endpoint?.params)
-        isLoadingFeed = false
+        if (selectedChip != null) {
+            isLoadingFeed = true
+            val filtered = YouTubeMusicService.getHomeFeed(selectedChip?.endpoint?.params)
+            if (filtered != null && filtered.sections.isNotEmpty()) {
+                homeFeed = filtered
+            } else {
+                fallbackQuickPicks = YouTubeMusicService.search("${selectedChip?.title} Songs")
+            }
+            isLoadingFeed = false
+        }
     }
 
     LazyColumn(
@@ -68,7 +93,7 @@ fun HomeScreen(
                 Text(
                     text = "Muzi",
                     color = TextPrimary,
-                    fontSize = 22.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(18.dp))
@@ -98,6 +123,94 @@ fun HomeScreen(
                             }
                         }
                     }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(defaultMoodChips) { chipName ->
+                            val isSelected = chipName == selectedChip?.title
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) Color(0xFFE50914) else ChipBackground)
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            isLoadingFeed = true
+                                            fallbackQuickPicks = YouTubeMusicService.search("$chipName Songs")
+                                            isLoadingFeed = false
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = chipName,
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Keep Listening / Recently Played (Android Muzi feature)
+        if (historySongs.isNotEmpty() && selectedChip == null) {
+            item {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Keep listening",
+                            color = TextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(historySongs.take(10)) { song ->
+                            Column(
+                                modifier = Modifier
+                                    .width(130.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        DesktopAudioPlayer.playSong(song, historySongs)
+                                        onSongClick(song)
+                                    }
+                            ) {
+                                AsyncImage(
+                                    model = song.thumbnailUrl,
+                                    contentDescription = song.title,
+                                    modifier = Modifier
+                                        .size(130.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = song.title,
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = song.artist,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -122,9 +235,11 @@ fun HomeScreen(
                                     .width(150.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable {
-                                        // Find chip with same name or search
-                                        homeFeed?.chips?.firstOrNull { it.title.contains("Top", ignoreCase = true) }?.let {
-                                            selectedChip = it
+                                        coroutineScope.launch {
+                                            isLoadingFeed = true
+                                            fallbackQuickPicks = YouTubeMusicService.search(chart.title)
+                                            homeFeed = null
+                                            isLoadingFeed = false
                                         }
                                     }
                             ) {
@@ -169,15 +284,15 @@ fun HomeScreen(
                     CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
                 }
             }
-        } else {
+        } else if (homeFeed != null && homeFeed!!.sections.isNotEmpty()) {
             // Dynamic YouTube Music Sections (100% Exact Android Muzi Content Feed)
-            val sections = homeFeed?.sections ?: emptyList()
+            val sections = homeFeed!!.sections
             items(sections) { section ->
                 val songItems = section.items.filterIsInstance<SongItem>().map { item ->
                     Song(
                         id = item.id,
                         title = item.title,
-                        artist = item.artists?.joinToString(", ") { it.name } ?: "Album",
+                        artist = item.artists.joinToString(", ") { it.name },
                         album = item.album?.name ?: "Single",
                         durationText = item.duration?.let { "%d:%02d".format(it / 60, it % 60) } ?: "3:30",
                         durationSeconds = item.duration?.toLong() ?: 210L,
@@ -290,8 +405,13 @@ fun HomeScreen(
                                         .width(150.dp)
                                         .clip(RoundedCornerShape(10.dp))
                                         .clickable {
-                                            // Search songs for this item
-                                            // To play album/playlist
+                                            coroutineScope.launch {
+                                                val searchResults = YouTubeMusicService.search(title)
+                                                if (searchResults.isNotEmpty()) {
+                                                    DesktopAudioPlayer.playSong(searchResults.first(), searchResults)
+                                                    onSongClick(searchResults.first())
+                                                }
+                                            }
                                         }
                                 ) {
                                     AsyncImage(
@@ -323,6 +443,87 @@ fun HomeScreen(
                     }
                 }
             }
+        } else if (fallbackQuickPicks.isNotEmpty()) {
+            // Quick Picks Fallback Grid
+            item {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Quick picks",
+                            color = TextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Button(
+                            onClick = {
+                                DesktopAudioPlayer.playSong(fallbackQuickPicks.first(), fallbackQuickPicks)
+                                onSongClick(fallbackQuickPicks.first())
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("Play all", color = TextPrimary, fontSize = 13.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    val chunked = fallbackQuickPicks.take(16).chunked(4)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        chunked.forEach { rowSongs ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                rowSongs.forEach { song ->
+                                    Row(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                DesktopAudioPlayer.playSong(song, fallbackQuickPicks)
+                                                onSongClick(song)
+                                            }
+                                            .padding(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AsyncImage(
+                                            model = song.thumbnailUrl,
+                                            contentDescription = song.title,
+                                            modifier = Modifier
+                                                .size(52.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = song.title,
+                                                color = TextPrimary,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = song.artist,
+                                                color = TextSecondary,
+                                                fontSize = 12.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                                repeat(4 - rowSongs.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         item {
@@ -330,4 +531,3 @@ fun HomeScreen(
         }
     }
 }
-
