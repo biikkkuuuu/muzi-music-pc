@@ -34,10 +34,17 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
     implementation("io.ktor:ktor-client-encoding:3.0.3")
     
-    // OkHttp
+    // OkHttp & Brotli
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.brotli:dec:0.1.2")
     
-    // JavaFX Media for native m4a, aac, and mp3 playback on Windows
+    // Exact NewPipeExtractor from Muzi Android app
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.4") {
+        exclude(group = "com.google.protobuf", module = "protobuf-java")
+    }
+    implementation("com.grack:nanojson:1.9")
+    
+    // JavaFX Media for native high quality streaming on Windows
     implementation("org.openjfx:javafx-media:21.0.2:win")
     implementation("org.openjfx:javafx-base:21.0.2:win")
     implementation("org.openjfx:javafx-graphics:21.0.2:win")

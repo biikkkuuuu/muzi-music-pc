@@ -1,19 +1,28 @@
 package com.muzi.desktop.innertube
 
+import com.music.innertube.NewPipeDownloaderImpl
+import com.music.innertube.NewPipeUtils
+import com.music.innertube.YouTube
+import com.music.innertube.models.SongItem
 import com.muzi.desktop.model.ChartItem
 import com.muzi.desktop.model.Song
-import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.*
-import java.net.URLEncoder
+import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.stream.StreamInfo
 
 object YouTubeMusicService {
-    private val client = HttpClient(OkHttp)
-    private val json = Json { ignoreUnknownKeys = true }
+    private var isNewPipeInit = false
+
+    private fun ensureNewPipe() {
+        if (!isNewPipeInit) {
+            try {
+                val downloader = NewPipeDownloaderImpl(YouTube.proxy, YouTube.proxyAuth)
+                NewPipeUtils(downloader)
+                isNewPipeInit = true
+            } catch (_: Exception) {}
+        }
+    }
 
     suspend fun getBrowseCharts(): List<ChartItem> = withContext(Dispatchers.IO) {
         listOf(
@@ -26,63 +35,68 @@ object YouTubeMusicService {
     }
 
     suspend fun getQuickPicks(): List<Song> = withContext(Dispatchers.IO) {
-        val searchPicks = search("Hindi Trending Songs")
-        if (searchPicks.isNotEmpty()) searchPicks else listOf(
-            Song(
-                id = "1",
-                title = "Sahiba",
-                artist = "Aditya Rikhari",
-                album = "Sahiba",
-                durationText = "3:40",
-                durationSeconds = 220,
-                thumbnailUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music113/v4/b2/9f/45/b29f4582-a1a2-ec02-ee7d-21bef3346547/8718857677529.png/500x500bb.jpg",
-                streamUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/2e/43/de/2e43de6d-8347-233c-c55b-5e63180f453c/mzaf_11408243760072457560.plus.aac.p.m4a"
-            )
-        )
+        search("Top Trending Hindi Songs").ifEmpty {
+            search("Trending Songs")
+        }
     }
 
+    // Exact YouTube Music Search as Android Muzi App
     suspend fun search(query: String): List<Song> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
-        val encoded = URLEncoder.encode(query, "UTF-8")
-
         try {
-            val itunesUrl = "https://itunes.apple.com/search?term=$encoded&entity=song&limit=25"
-            val response = client.get(itunesUrl)
-            if (response.status.value in 200..299) {
-                val body = response.bodyAsText()
-                val jsonElement = json.parseToJsonElement(body).jsonObject
-                val results = jsonElement["results"]?.jsonArray
-                if (results != null && results.isNotEmpty()) {
-                    return@withContext results.mapNotNull { item ->
-                        val obj = item.jsonObject
-                        val trackId = obj["trackId"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                        val trackName = obj["trackName"]?.jsonPrimitive?.contentOrNull ?: "Unknown"
-                        val artistName = obj["artistName"]?.jsonPrimitive?.contentOrNull ?: "Unknown Artist"
-                        val previewUrl = obj["previewUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                        val artwork = obj["artworkUrl100"]?.jsonPrimitive?.contentOrNull?.replace("100x100bb", "500x500bb") ?: ""
-                        val durationMillis = obj["trackTimeMillis"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 210000L
-                        val durationSeconds = durationMillis / 1000
-                        val min = durationSeconds / 60
-                        val sec = durationSeconds % 60
-                        val durationText = "%d:%02d".format(min, sec)
+            val result = YouTube.searchSummary(query).getOrNull()
+            if (result != null) {
+                val allItems = result.summaries.flatMap { it.items }
+                val songList = allItems.filterIsInstance<SongItem>().map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = item.artists.joinToString(", ") { it.name },
+                        album = item.album?.name ?: "Single",
+                        durationText = item.duration?.let { "%d:%02d".format(it / 60, it % 60) } ?: "3:30",
+                        durationSeconds = item.duration?.toLong() ?: 210L,
+                        thumbnailUrl = item.thumbnail,
+                        streamUrl = null
+                    )
+                }.distinctBy { it.id }
 
-                        Song(
-                            id = trackId,
-                            title = trackName,
-                            artist = artistName,
-                            album = obj["collectionName"]?.jsonPrimitive?.contentOrNull ?: "Single",
-                            durationText = durationText,
-                            durationSeconds = durationSeconds,
-                            thumbnailUrl = artwork,
-                            streamUrl = previewUrl
-                        )
-                    }
+                if (songList.isNotEmpty()) {
+                    return@withContext songList
                 }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (_: Exception) {}
 
         emptyList()
+    }
+
+    // Exact Playback Stream Resolution as Android Muzi App using NewPipeExtractor
+    suspend fun resolveStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
+        ensureNewPipe()
+        try {
+            val streamInfo = StreamInfo.getInfo(
+                NewPipe.getService(0),
+                "https://www.youtube.com/watch?v=$videoId"
+            )
+            val audioStreams = streamInfo.audioStreams
+            val bestAudio = audioStreams.maxByOrNull { it.averageBitrate } ?: audioStreams.firstOrNull()
+            if (bestAudio != null && !bestAudio.content.isNullOrBlank()) {
+                return@withContext bestAudio.content
+            }
+        } catch (_: Exception) {}
+
+        try {
+            val playerResponse = YouTube.player(videoId = videoId, client = com.music.innertube.models.YouTubeClient.WEB_REMIX).getOrNull()
+            val format = playerResponse?.streamingData?.adaptiveFormats?.firstOrNull {
+                it.mimeType.startsWith("audio/")
+            } ?: playerResponse?.streamingData?.formats?.firstOrNull()
+
+            if (format != null) {
+                val downloader = NewPipeDownloaderImpl(YouTube.proxy, YouTube.proxyAuth)
+                val utils = NewPipeUtils(downloader)
+                return@withContext utils.getStreamUrl(format, videoId) ?: format.url
+            }
+        } catch (_: Exception) {}
+
+        null
     }
 }

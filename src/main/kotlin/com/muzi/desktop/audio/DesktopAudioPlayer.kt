@@ -1,5 +1,6 @@
 package com.muzi.desktop.audio
 
+import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
 import javafx.application.Platform
 import javafx.scene.media.Media
@@ -37,17 +38,6 @@ object DesktopAudioPlayer {
         } catch (_: Exception) {
             isFxInitialized = true
         }
-
-        _currentSong.value = Song(
-            id = "1",
-            title = "Sahiba",
-            artist = "Aditya Rikhari",
-            album = "Sahiba",
-            durationText = "3:40",
-            durationSeconds = 220,
-            thumbnailUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music113/v4/b2/9f/45/b29f4582-a1a2-ec02-ee7d-21bef3346547/8718857677529.png/500x500bb.jpg",
-            streamUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/2e/43/de/2e43de6d-8347-233c-c55b-5e63180f453c/mzaf_11408243760072457560.plus.aac.p.m4a"
-        )
     }
 
     fun playSong(song: Song) {
@@ -56,9 +46,12 @@ object DesktopAudioPlayer {
         _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 220000L
         _isPlaying.value = true
 
-        val url = song.streamUrl
-        if (url != null) {
-            startFxPlayback(url)
+        scope.launch {
+            val url = song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
+            if (url != null) {
+                _currentSong.value = song.copy(streamUrl = url)
+                startFxPlayback(url)
+            }
         }
     }
 
