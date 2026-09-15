@@ -1,4 +1,4 @@
-package com.muzi.desktop.ui.screens
+ï»¿package com.muzi.desktop.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -95,7 +95,7 @@ fun SettingsScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isSelected) Color(0xFFE50914) else Color(0xFF222222))
+                                    .background(if (isSelected) MuziAccent else Color(0xFF222222))
                                     .clickable { selectedQuality = q }
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
@@ -125,7 +125,7 @@ fun SettingsScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isSelected) Color(0xFFE50914) else Color(0xFF222222))
+                                    .background(if (isSelected) MuziAccent else Color(0xFF222222))
                                     .clickable { selectedPreset = p }
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
@@ -161,9 +161,9 @@ fun SettingsScreen(
             SettingsCard(title = "About Muzi Desktop", icon = Icons.Default.Info) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Muzi Music for Windows (PC)", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Version 1.2.0 • Standalone Desktop Edition", color = TextSecondary, fontSize = 13.sp)
+                    Text("Version 1.2.0 â€¢ Standalone Desktop Edition", color = TextSecondary, fontSize = 13.sp)
                     Text("Engine: Native YouTube Music / InnerTube Stream Pipeline", color = TextSecondary, fontSize = 13.sp)
-                    Text("Created for Vikash Rana • GitHub: biikkkuuuu/muzi-music-pc", color = TextSecondary, fontSize = 13.sp)
+                    Text("Created for Vikash Rana â€¢ GitHub: biikkkuuuu/muzi-music-pc", color = TextSecondary, fontSize = 13.sp)
                 }
             }
         }
@@ -188,7 +188,7 @@ private fun SettingsCard(
             .padding(20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(imageVector = icon, contentDescription = title, tint = Color(0xFFE50914), modifier = Modifier.size(22.dp))
+            Icon(imageVector = icon, contentDescription = title, tint = MuziAccent, modifier = Modifier.size(22.dp))
             Spacer(modifier = Modifier.width(12.dp))
             Text(text = title, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }

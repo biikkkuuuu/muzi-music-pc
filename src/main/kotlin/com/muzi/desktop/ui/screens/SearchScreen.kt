@@ -1,4 +1,4 @@
-package com.muzi.desktop.ui.screens
+﻿package com.muzi.desktop.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -117,7 +117,7 @@ fun SearchScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) Color(0xFFE50914) else Color(0xFF1E1E1E))
+                        .background(if (isSelected) MuziAccent else Color(0xFF1E1E1E))
                         .clickable { selectedFilter = tab }
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
@@ -279,7 +279,7 @@ fun SearchScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${song.artist} � ${song.durationText}",
+                                    text = "${song.artist} • ${song.durationText}",
                                     color = TextSecondary,
                                     fontSize = 13.sp,
                                     maxLines = 1,

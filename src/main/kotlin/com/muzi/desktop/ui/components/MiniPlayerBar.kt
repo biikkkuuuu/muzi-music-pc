@@ -1,8 +1,7 @@
-package com.muzi.desktop.ui.components
+﻿package com.muzi.desktop.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,8 +30,7 @@ import coil3.compose.AsyncImage
 import com.muzi.desktop.audio.DesktopAudioPlayer
 import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.model.Song
-import com.muzi.desktop.ui.theme.TextPrimary
-import com.muzi.desktop.ui.theme.TextSecondary
+import com.muzi.desktop.ui.theme.*
 
 @Composable
 fun MiniPlayerBar(
@@ -45,17 +42,10 @@ fun MiniPlayerBar(
 ) {
     if (song == null) return
 
-    val dynamicColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
     val positionMillis by DesktopAudioPlayer.currentPositionMillis.collectAsState()
     val durationMillis by DesktopAudioPlayer.durationMillis.collectAsState()
     val likedSongs by LibraryManager.likedSongs.collectAsState()
     val isLiked = LibraryManager.isLiked(song.id)
-
-    val animatedColor by animateColorAsState(
-        targetValue = dynamicColor,
-        animationSpec = tween(600),
-        label = "MiniPlayerBg"
-    )
 
     val progress = if (durationMillis > 0) (positionMillis.toFloat() / durationMillis.toFloat()).coerceIn(0f, 1f) else 0f
 
@@ -67,43 +57,32 @@ fun MiniPlayerBar(
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 560.dp)
+                .widthIn(max = 600.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            animatedColor.copy(alpha = 0.95f),
-                            animatedColor.copy(
-                                red = (animatedColor.red * 0.55f).coerceAtLeast(0f),
-                                green = (animatedColor.green * 0.55f).coerceAtLeast(0f),
-                                blue = (animatedColor.blue * 0.55f).coerceAtLeast(0f),
-                                alpha = 0.98f
-                            )
-                        )
-                    )
-                )
+                .clip(RoundedCornerShape(18.dp))
+                .background(SurfaceElevated)
+                .border(1.dp, SurfaceBorder, RoundedCornerShape(18.dp))
                 .clickable(onClick = onClick)
         ) {
-            // Thin Mini Progress Bar on top edge (Android Muzi Floating Accessory)
+            // Live Progress Bar on top edge (Signature Muzi Red #ED5564)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)
-                    .background(Color(0x33FFFFFF))
+                    .background(Color(0xFF222222))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(progress)
                         .fillMaxHeight()
-                        .background(Color.White)
+                        .background(MuziAccent)
                 )
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -115,10 +94,10 @@ fun MiniPlayerBar(
                         model = song.thumbnailUrl,
                         contentDescription = song.title,
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(8.dp))
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
                             text = song.title,
@@ -128,9 +107,10 @@ fun MiniPlayerBar(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = song.artist,
-                            color = TextSecondary.copy(alpha = 0.85f),
+                            color = TextSecondary,
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -139,7 +119,7 @@ fun MiniPlayerBar(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Like button in mini player
+                    // Like button in mini player (Muzi Coral Red when liked)
                     IconButton(
                         onClick = { LibraryManager.toggleLike(song) },
                         modifier = Modifier.size(36.dp)
@@ -147,7 +127,7 @@ fun MiniPlayerBar(
                         Icon(
                             imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Like",
-                            tint = if (isLiked) Color(0xFFFF3366) else Color.White,
+                            tint = if (isLiked) MuziAccent else Color(0xFF888888),
                             modifier = Modifier.size(20.dp)
                         )
                     }

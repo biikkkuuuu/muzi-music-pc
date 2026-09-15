@@ -1,4 +1,4 @@
-package com.muzi.desktop.ui.screens
+﻿package com.muzi.desktop.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -108,7 +108,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) Color(0xFFE50914) else ChipBackground)
+                                    .background(if (isSelected) MuziAccent else ChipBackground)
                                     .clickable {
                                         selectedChip = if (isSelected) null else chip
                                     }
@@ -132,7 +132,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) Color(0xFFE50914) else ChipBackground)
+                                    .background(if (isSelected) MuziAccent else ChipBackground)
                                     .clickable {
                                         coroutineScope.launch {
                                             isLoadingFeed = true

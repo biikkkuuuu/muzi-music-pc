@@ -1,4 +1,4 @@
-package com.muzi.desktop.ui.components
+﻿package com.muzi.desktop.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.muzi.desktop.ui.theme.MuziAccent
 import com.muzi.desktop.ui.theme.PureBlack
 
 enum class ScreenTab {
@@ -76,14 +77,14 @@ private fun NavIconItem(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(if (isSelected) Color.White else Color.Transparent)
+            .background(if (isSelected) MuziAccent else Color.Transparent)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (isSelected) Color.Black else Color.White,
+            tint = if (isSelected) Color.White else Color(0xFF888888),
             modifier = Modifier.size(24.dp)
         )
     }

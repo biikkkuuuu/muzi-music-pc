@@ -1,7 +1,5 @@
-package com.muzi.desktop.ui.screens
+﻿package com.muzi.desktop.ui.screens
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,13 +49,6 @@ fun PlayerScreen(
     val isShuffle by DesktopAudioPlayer.isShuffle.collectAsState()
     val repeatMode by DesktopAudioPlayer.repeatMode.collectAsState()
     val likedSongs by LibraryManager.likedSongs.collectAsState()
-    val dynamicThemeColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
-
-    val animatedBgColor by animateColorAsState(
-        targetValue = dynamicThemeColor,
-        animationSpec = tween(700),
-        label = "PlayerDynamicBg"
-    )
 
     val isLiked = currentSong?.let { LibraryManager.isLiked(it.id) } ?: false
 
@@ -94,19 +84,10 @@ fun PlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        animatedBgColor.copy(alpha = 0.55f),
-                        animatedBgColor.copy(alpha = 0.15f),
-                        PureBlack,
-                        PureBlack
-                    )
-                )
-            )
+            .background(PureBlack)
             .padding(28.dp)
     ) {
-        // Back Button (Top Left)
+        // Back / Collapse Button (Top Left)
         IconButton(
             onClick = onBackClick,
             modifier = Modifier
@@ -119,7 +100,7 @@ fun PlayerScreen(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 24.dp),
+                .padding(top = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(48.dp)
         ) {
             // Left Column (Artwork + Song Info + Controls + Volume)
@@ -130,11 +111,11 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Album Art (Desktop-2.png with rounded corners and ambient shadow)
+                // Album Art with clean rounded corners
                 Box(
                     modifier = Modifier
                         .size(350.dp)
-                        .clip(RoundedCornerShape(22.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(SurfaceDark)
                 ) {
                     if (currentSong?.thumbnailUrl?.isNotEmpty() == true) {
@@ -159,7 +140,7 @@ fun PlayerScreen(
                             modifier = Modifier
                                 .size(48.dp)
                                 .align(Alignment.Center),
-                            color = Color.White,
+                            color = MuziAccent,
                             strokeWidth = 3.dp
                         )
                     }
@@ -192,14 +173,14 @@ fun PlayerScreen(
                         )
                     }
 
-                    // Like / Heart Icon
+                    // Like / Heart Icon (Muzi Coral Red when liked)
                     IconButton(
                         onClick = { currentSong?.let { LibraryManager.toggleLike(it) } }
                     ) {
                         Icon(
                             imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Like",
-                            tint = if (isLiked) Color(0xFFFF3366) else Color.White,
+                            tint = if (isLiked) MuziAccent else Color.White,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -207,7 +188,7 @@ fun PlayerScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Seek Progress Bar (with dynamic accent color)
+                // Seek Progress Bar (Signature Muzi Accent)
                 val progress = if (durationMillis > 0) positionMillis.toFloat() / durationMillis.toFloat() else 0f
                 Slider(
                     value = progress.coerceIn(0f, 1f),
@@ -217,8 +198,8 @@ fun PlayerScreen(
                     modifier = Modifier.width(360.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
-                        activeTrackColor = animatedBgColor,
-                        inactiveTrackColor = Color(0x44FFFFFF)
+                        activeTrackColor = MuziAccent,
+                        inactiveTrackColor = Color(0xFF262626)
                     )
                 )
 
@@ -243,25 +224,24 @@ fun PlayerScreen(
                         Icon(
                             Icons.Default.Shuffle,
                             contentDescription = "Shuffle",
-                            tint = if (isShuffle) Color.White else Color(0x44FFFFFF)
+                            tint = if (isShuffle) MuziAccent else Color(0x66FFFFFF)
                         )
                     }
                     IconButton(onClick = { DesktopAudioPlayer.playPrevious() }) {
                         Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(30.dp))
                     }
-                    Box(
+                    IconButton(
+                        onClick = { DesktopAudioPlayer.togglePlayPause() },
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape)
-                            .background(Color.White)
-                            .clickable { DesktopAudioPlayer.togglePlayPause() },
-                        contentAlignment = Alignment.Center
+                            .background(MuziAccent)
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = "Play/Pause",
-                            tint = Color.Black,
-                            modifier = Modifier.size(32.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(34.dp)
                         )
                     }
                     IconButton(onClick = { DesktopAudioPlayer.playNext() }) {
@@ -274,12 +254,12 @@ fun PlayerScreen(
                                 else -> Icons.Default.Repeat
                             },
                             contentDescription = "Repeat",
-                            tint = if (repeatMode != RepeatMode.OFF) Color.White else Color(0x44FFFFFF)
+                            tint = if (repeatMode != RepeatMode.OFF) MuziAccent else Color(0x66FFFFFF)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Volume Slider (Muzi Desktop essential control)
                 Row(
@@ -300,7 +280,7 @@ fun PlayerScreen(
                         colors = SliderDefaults.colors(
                             thumbColor = Color.White,
                             activeTrackColor = Color.White,
-                            inactiveTrackColor = Color(0x33FFFFFF)
+                            inactiveTrackColor = Color(0xFF262626)
                         )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -327,46 +307,31 @@ fun PlayerScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Lyrics",
-                        color = if (sideTab == PlayerSideTab.LYRICS) Color.White else Color(0x55FFFFFF),
-                        fontSize = 18.sp,
-                        fontWeight = if (sideTab == PlayerSideTab.LYRICS) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { sideTab = PlayerSideTab.LYRICS }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    TabPill(
+                        title = "Lyrics",
+                        isSelected = sideTab == PlayerSideTab.LYRICS,
+                        onClick = { sideTab = PlayerSideTab.LYRICS }
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Up Next (${queue.size})",
-                        color = if (sideTab == PlayerSideTab.QUEUE) Color.White else Color(0x55FFFFFF),
-                        fontSize = 18.sp,
-                        fontWeight = if (sideTab == PlayerSideTab.QUEUE) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { sideTab = PlayerSideTab.QUEUE }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    TabPill(
+                        title = "Up Next (${queue.size})",
+                        isSelected = sideTab == PlayerSideTab.QUEUE,
+                        onClick = { sideTab = PlayerSideTab.QUEUE }
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Details",
-                        color = if (sideTab == PlayerSideTab.DETAILS) Color.White else Color(0x55FFFFFF),
-                        fontSize = 18.sp,
-                        fontWeight = if (sideTab == PlayerSideTab.DETAILS) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { sideTab = PlayerSideTab.DETAILS }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    TabPill(
+                        title = "Details",
+                        isSelected = sideTab == PlayerSideTab.DETAILS,
+                        onClick = { sideTab = PlayerSideTab.DETAILS }
                     )
                 }
 
                 when (sideTab) {
                     PlayerSideTab.LYRICS -> {
-                        // Lyrics View (Desktop-2.png)
+                        // Lyrics View
                         if (lyrics.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("No lyrics available", color = Color(0x44FFFFFF), fontSize = 16.sp)
+                                Text("No lyrics available for this song", color = Color(0x44FFFFFF), fontSize = 16.sp)
                             }
                         } else {
                             LazyColumn(
@@ -379,8 +344,8 @@ fun PlayerScreen(
                                     val isActive = index == activeIndex
                                     Text(
                                         text = line.text,
-                                        color = if (isActive) Color.White else Color(0x55FFFFFF),
-                                        fontSize = if (isActive) 26.sp else 20.sp,
+                                        color = if (isActive) Color.White else Color(0xFF555555),
+                                        fontSize = if (isActive) 26.sp else 19.sp,
                                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier
@@ -405,7 +370,7 @@ fun PlayerScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isCurrent) animatedBgColor.copy(alpha = 0.25f) else Color.Transparent)
+                                        .background(if (isCurrent) MuziAccent.copy(alpha = 0.16f) else Color.Transparent)
                                         .clickable { DesktopAudioPlayer.playSongAt(index) }
                                         .padding(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -421,9 +386,9 @@ fun PlayerScreen(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = item.title,
-                                            color = if (isCurrent) Color.White else TextPrimary,
+                                            color = if (isCurrent) MuziAccent else TextPrimary,
                                             fontSize = 14.sp,
-                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -437,16 +402,10 @@ fun PlayerScreen(
                                     }
                                     if (isCurrent) {
                                         Icon(
-                                            Icons.Default.VolumeUp,
+                                            Icons.Default.GraphicEq,
                                             contentDescription = "Playing",
-                                            tint = animatedBgColor,
+                                            tint = MuziAccent,
                                             modifier = Modifier.size(20.dp)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = item.durationText,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp
                                         )
                                     }
                                 }
@@ -454,19 +413,20 @@ fun PlayerScreen(
                         }
                     }
                     PlayerSideTab.DETAILS -> {
-                        // Song Details View
+                        // Audio Details (Ported from Android Muzi Technical details)
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(18.dp)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            DetailRow("Song Title", currentSong?.title ?: "Unknown")
-                            DetailRow("Artist", currentSong?.artist ?: "Unknown")
-                            DetailRow("Album", currentSong?.album?.ifEmpty { "Single" } ?: "Single")
-                            DetailRow("Duration", currentSong?.durationText ?: formatTime(durationMillis))
-                            DetailRow("Quality", "128 kbps AAC (High Definition)")
-                            DetailRow("Provider", "YouTube Music (Muzi Native Backend)")
+                            DetailCard(title = "Title", value = currentSong?.title ?: "-")
+                            DetailCard(title = "Artist", value = currentSong?.artist ?: "-")
+                            DetailCard(title = "YouTube Video ID", value = currentSong?.id ?: "-")
+                            DetailCard(title = "Duration", value = formatTime(durationMillis))
+                            DetailCard(title = "Audio Engine", value = "JavaFX Native MediaPlayer + InnerTube Stream")
+                            DetailCard(title = "Audio Quality", value = "256 kbps AAC / M4A Native Stream")
+                            DetailCard(title = "Theme", value = "Muzi AMOLED Black (#000000) & Muzi Coral (#ED5564)")
                         }
                     }
                 }
@@ -476,11 +436,39 @@ fun PlayerScreen(
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
-    Column {
-        Text(text = label, color = TextSecondary, fontSize = 13.sp)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(text = value, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+private fun TabPill(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) MuziAccent else Color(0xFF1E1E1E))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = title,
+            color = if (isSelected) Color.White else TextSecondary,
+            fontSize = 14.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun DetailCard(title: String, value: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceElevated)
+            .padding(14.dp)
+    ) {
+        Text(text = title, color = TextSecondary, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(text = value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

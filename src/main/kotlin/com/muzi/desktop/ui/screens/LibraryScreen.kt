@@ -1,4 +1,4 @@
-package com.muzi.desktop.ui.screens
+﻿package com.muzi.desktop.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -59,7 +59,7 @@ fun LibraryScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFE50914),
+                        focusedBorderColor = MuziAccent,
                         unfocusedBorderColor = Color(0x66FFFFFF)
                     )
                 )
@@ -73,7 +73,7 @@ fun LibraryScreen(
                             showCreateDialog = false
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914))
+                    colors = ButtonDefaults.buttonColors(containerColor = MuziAccent)
                 ) {
                     Text("Create", color = Color.White)
                 }
@@ -277,7 +277,7 @@ fun LibraryScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${song.artist} � ${song.durationText}",
+                                    text = "${song.artist} • ${song.durationText}",
                                     color = TextSecondary,
                                     fontSize = 13.sp,
                                     maxLines = 1,
