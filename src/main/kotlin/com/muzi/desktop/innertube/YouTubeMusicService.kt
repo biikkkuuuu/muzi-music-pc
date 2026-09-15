@@ -5,6 +5,7 @@ import com.music.innertube.NewPipeUtils
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.music.innertube.models.WatchEndpoint
+import com.music.innertube.pages.HomePage
 import com.muzi.desktop.model.ChartItem
 import com.muzi.desktop.model.Song
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,25 @@ object YouTubeMusicService {
                 NewPipeUtils(downloader)
                 isNewPipeInit = true
             } catch (_: Exception) {}
+        }
+    }
+
+    data class HomeFeed(
+        val chips: List<HomePage.Chip>,
+        val sections: List<HomePage.Section>
+    )
+
+    // Exact 100% Android Muzi Home Feed via InnerTube
+    suspend fun getHomeFeed(params: String? = null): HomeFeed? = withContext(Dispatchers.IO) {
+        try {
+            val page = YouTube.home(params = params).getOrNull() ?: return@withContext null
+            return@withContext HomeFeed(
+                chips = page.chips ?: emptyList(),
+                sections = page.sections
+            )
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] Error loading home feed: ${e.message}")
+            null
         }
     }
 
