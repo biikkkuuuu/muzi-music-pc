@@ -6,10 +6,10 @@ import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+import java.net.URLEncoder
 
 object YouTubeMusicService {
     private val client = HttpClient(OkHttp)
@@ -35,163 +35,54 @@ object YouTubeMusicService {
                 album = "Sahiba",
                 durationText = "3:40",
                 durationSeconds = 220,
-                thumbnailUrl = "https://c.saavncdn.com/264/Sahiba-Hindi-2024-20240320144026-500x500.jpg",
-                streamUrl = null
+                thumbnailUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music113/v4/b2/9f/45/b29f4582-a1a2-ec02-ee7d-21bef3346547/8718857677529.png/500x500bb.jpg",
+                streamUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/2e/43/de/2e43de6d-8347-233c-c55b-5e63180f453c/mzaf_11408243760072457560.plus.aac.p.m4a"
             )
         )
     }
 
-    // Direct InnerTube YouTube Music Search - Exactly like Android App (WEB_REMIX Client)
     suspend fun search(query: String): List<Song> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
+        val encoded = URLEncoder.encode(query, "UTF-8")
+
         try {
-            val url = "https://music.youtube.com/youtubei/v1/search"
-            val bodyPayload = """
-            {
-                "context": {
-                    "client": {
-                        "clientName": "WEB_REMIX",
-                        "clientVersion": "1.20260213.01.00",
-                        "hl": "en",
-                        "gl": "IN"
-                    }
-                },
-                "query": "${query.replace("\"", "\\\"")}",
-                "params": "Eg-KAQwIABAAGAAgACgAMABqChAEEAMQCRAFEAo%3D"
-            }
-            """.trimIndent()
-
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                header("Origin", "https://music.youtube.com")
-                header("Referer", "https://music.youtube.com/")
-                setBody(bodyPayload)
-            }
-
-            if (response.status.value in 200..299) {
-                val responseText = response.bodyAsText()
-                val jsonElement = json.parseToJsonElement(responseText)
-                val results = parseInnerTubeSearchResults(jsonElement)
-                if (results.isNotEmpty()) {
-                    return@withContext results
-                }
-            }
-        } catch (_: Exception) {}
-
-        // Fallback to JioSaavn API for instant direct Indian/International high-speed streams
-        try {
-            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-            val saavnUrl = "https://saavn.dev/api/search/songs?query=$encoded&limit=20"
-            val response = client.get(saavnUrl)
+            val itunesUrl = "https://itunes.apple.com/search?term=$encoded&entity=song&limit=25"
+            val response = client.get(itunesUrl)
             if (response.status.value in 200..299) {
                 val body = response.bodyAsText()
                 val jsonElement = json.parseToJsonElement(body).jsonObject
-                val data = jsonElement["data"]?.jsonObject
-                val results = data?.get("results")?.jsonArray
-
+                val results = jsonElement["results"]?.jsonArray
                 if (results != null && results.isNotEmpty()) {
                     return@withContext results.mapNotNull { item ->
                         val obj = item.jsonObject
-                        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                        val name = obj["name"]?.jsonPrimitive?.contentOrNull?.replace("&quot;", "\"")?.replace("&#039;", "'") ?: "Unknown"
-                        val artist = obj["artists"]?.jsonObject?.get("primary")?.jsonArray?.firstOrNull()?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull ?: "Unknown Artist"
-                        val duration = obj["duration"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 210
-                        val min = duration / 60
-                        val sec = duration % 60
+                        val trackId = obj["trackId"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                        val trackName = obj["trackName"]?.jsonPrimitive?.contentOrNull ?: "Unknown"
+                        val artistName = obj["artistName"]?.jsonPrimitive?.contentOrNull ?: "Unknown Artist"
+                        val previewUrl = obj["previewUrl"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                        val artwork = obj["artworkUrl100"]?.jsonPrimitive?.contentOrNull?.replace("100x100bb", "500x500bb") ?: ""
+                        val durationMillis = obj["trackTimeMillis"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 210000L
+                        val durationSeconds = durationMillis / 1000
+                        val min = durationSeconds / 60
+                        val sec = durationSeconds % 60
                         val durationText = "%d:%02d".format(min, sec)
 
-                        val images = obj["image"]?.jsonArray
-                        val thumb = images?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull ?: ""
-
-                        val downloadUrls = obj["downloadUrl"]?.jsonArray
-                        // High quality 320kbps MP3 direct stream
-                        val stream = downloadUrls?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
-
                         Song(
-                            id = id,
-                            title = name,
-                            artist = artist,
-                            album = obj["album"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull ?: "",
+                            id = trackId,
+                            title = trackName,
+                            artist = artistName,
+                            album = obj["collectionName"]?.jsonPrimitive?.contentOrNull ?: "Single",
                             durationText = durationText,
-                            durationSeconds = duration.toLong(),
-                            thumbnailUrl = thumb,
-                            streamUrl = stream
+                            durationSeconds = durationSeconds,
+                            thumbnailUrl = artwork,
+                            streamUrl = previewUrl
                         )
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         emptyList()
-    }
-
-    private fun parseInnerTubeSearchResults(root: JsonElement): List<Song> {
-        val songs = mutableListOf<Song>()
-        try {
-            val contents = root.jsonObject["contents"]
-                ?.jsonObject?.get("tabbedSearchResultsRenderer")
-                ?.jsonObject?.get("tabs")
-                ?.jsonArray?.firstOrNull()
-                ?.jsonObject?.get("tabRenderer")
-                ?.jsonObject?.get("content")
-                ?.jsonObject?.get("sectionListRenderer")
-                ?.jsonObject?.get("contents")
-                ?.jsonArray ?: return emptyList()
-
-            for (section in contents) {
-                val shelf = section.jsonObject["musicShelfRenderer"]?.jsonObject ?: continue
-                val items = shelf["contents"]?.jsonArray ?: continue
-
-                for (item in items) {
-                    val renderer = item.jsonObject["musicResponsiveListItemRenderer"]?.jsonObject ?: continue
-                    val flexColumns = renderer["flexColumns"]?.jsonArray ?: continue
-
-                    // Title
-                    val titleRuns = flexColumns.getOrNull(0)?.jsonObject
-                        ?.get("musicResponsiveListItemFlexColumnRenderer")?.jsonObject
-                        ?.get("text")?.jsonObject?.get("runs")?.jsonArray
-
-                    val title = titleRuns?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: continue
-                    val videoId = titleRuns.firstOrNull()?.jsonObject?.get("navigationEndpoint")?.jsonObject
-                        ?.get("watchEndpoint")?.jsonObject?.get("videoId")?.jsonPrimitive?.contentOrNull
-                        ?: renderer["playlistItemData"]?.jsonObject?.get("videoId")?.jsonPrimitive?.contentOrNull
-                        ?: continue
-
-                    // Artist & Duration
-                    val subtitleRuns = flexColumns.getOrNull(1)?.jsonObject
-                        ?.get("musicResponsiveListItemFlexColumnRenderer")?.jsonObject
-                        ?.get("text")?.jsonObject?.get("runs")?.jsonArray
-
-                    val artist = subtitleRuns?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: "Unknown Artist"
-                    val durationText = subtitleRuns?.lastOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: "3:30"
-
-                    // Thumbnail
-                    val thumbnails = renderer["thumbnail"]?.jsonObject
-                        ?.get("musicItemThumbnailOverlayRenderer")?.jsonObject
-                        ?.get("thumbnail")?.jsonObject?.get("musicThumbnailRenderer")?.jsonObject
-                        ?.get("thumbnail")?.jsonObject?.get("thumbnails")?.jsonArray
-                        ?: renderer["thumbnail"]?.jsonObject?.get("musicThumbnailRenderer")?.jsonObject
-                            ?.get("thumbnail")?.jsonObject?.get("thumbnails")?.jsonArray
-
-                    val thumbnailUrl = thumbnails?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
-                        ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
-
-                    songs.add(
-                        Song(
-                            id = videoId,
-                            title = title,
-                            artist = artist,
-                            album = "YouTube Music",
-                            durationText = durationText,
-                            durationSeconds = 210,
-                            thumbnailUrl = thumbnailUrl,
-                            streamUrl = null
-                        )
-                    )
-                }
-            }
-        } catch (_: Exception) {}
-        return songs
     }
 }

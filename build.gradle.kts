@@ -37,8 +37,10 @@ dependencies {
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
-    // JLayer for fast and reliable MP3 audio playback
-    implementation("javazoom:jlayer:1.0.1")
+    // JavaFX Media for native m4a, aac, and mp3 playback on Windows
+    implementation("org.openjfx:javafx-media:21.0.2:win")
+    implementation("org.openjfx:javafx-base:21.0.2:win")
+    implementation("org.openjfx:javafx-graphics:21.0.2:win")
     
     // Image Loading in Compose Desktop (Coil 3 Multiplatform)
     implementation("io.coil-kt.coil3:coil-compose:3.1.0")

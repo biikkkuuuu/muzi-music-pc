@@ -1,13 +1,13 @@
 package com.muzi.desktop.audio
 
 import com.muzi.desktop.model.Song
-import javazoom.jl.player.Player
+import javafx.application.Platform
+import javafx.scene.media.Media
+import javafx.scene.media.MediaPlayer
+import javafx.util.Duration
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.io.BufferedInputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 object DesktopAudioPlayer {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -21,17 +21,23 @@ object DesktopAudioPlayer {
     private val _currentPositionMillis = MutableStateFlow(0L)
     val currentPositionMillis = _currentPositionMillis.asStateFlow()
 
-    private val _durationMillis = MutableStateFlow(195000L)
+    private val _durationMillis = MutableStateFlow(220000L)
     val durationMillis = _durationMillis.asStateFlow()
 
     private val _volume = MutableStateFlow(0.85f)
     val volume = _volume.asStateFlow()
 
-    private var progressJob: Job? = null
-    private var playbackJob: Job? = null
-    private var player: Player? = null
+    private var mediaPlayer: MediaPlayer? = null
+    private var isFxInitialized = false
 
     init {
+        try {
+            Platform.startup {}
+            isFxInitialized = true
+        } catch (_: Exception) {
+            isFxInitialized = true
+        }
+
         _currentSong.value = Song(
             id = "1",
             title = "Sahiba",
@@ -39,20 +45,21 @@ object DesktopAudioPlayer {
             album = "Sahiba",
             durationText = "3:40",
             durationSeconds = 220,
-            thumbnailUrl = "https://c.saavncdn.com/264/Sahiba-Hindi-2024-20240320144026-500x500.jpg",
-            streamUrl = "https://aac.saavncdn.com/264/4baae14979e2c608f0a05a8f4c20f12c_320.mp3"
+            thumbnailUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music113/v4/b2/9f/45/b29f4582-a1a2-ec02-ee7d-21bef3346547/8718857677529.png/500x500bb.jpg",
+            streamUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/2e/43/de/2e43de6d-8347-233c-c55b-5e63180f453c/mzaf_11408243760072457560.plus.aac.p.m4a"
         )
     }
 
     fun playSong(song: Song) {
         _currentSong.value = song
         _currentPositionMillis.value = 0L
-        _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 200000L
+        _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 220000L
         _isPlaying.value = true
-        startProgressTicker()
 
-        val url = song.streamUrl ?: "https://aac.saavncdn.com/264/4baae14979e2c608f0a05a8f4c20f12c_320.mp3"
-        startPlayback(url)
+        val url = song.streamUrl
+        if (url != null) {
+            startFxPlayback(url)
+        }
     }
 
     fun togglePlayPause() {
@@ -65,68 +72,63 @@ object DesktopAudioPlayer {
 
     fun play() {
         _isPlaying.value = true
-        startProgressTicker()
-        _currentSong.value?.let { playSong(it) }
+        Platform.runLater {
+            mediaPlayer?.play()
+        }
     }
 
     fun pause() {
         _isPlaying.value = false
-        progressJob?.cancel()
-        stopPlayback()
+        Platform.runLater {
+            mediaPlayer?.pause()
+        }
     }
 
     fun seekTo(positionMillis: Long) {
-        _currentPositionMillis.value = positionMillis.coerceIn(0L, _durationMillis.value)
+        _currentPositionMillis.value = positionMillis
+        Platform.runLater {
+            mediaPlayer?.seek(Duration.millis(positionMillis.toDouble()))
+        }
     }
 
     fun setVolume(newVolume: Float) {
         _volume.value = newVolume.coerceIn(0f, 1f)
-    }
-
-    private fun startPlayback(streamUrl: String?) {
-        if (streamUrl == null) return
-        stopPlayback()
-
-        playbackJob = scope.launch(Dispatchers.IO) {
-            try {
-                val url = URL(streamUrl)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                conn.instanceFollowRedirects = true
-                conn.connectTimeout = 8000
-                conn.readTimeout = 12000
-                conn.connect()
-
-                val bufferedStream = BufferedInputStream(conn.inputStream)
-                val newPlayer = Player(bufferedStream)
-                player = newPlayer
-
-                newPlayer.play()
-            } catch (e: Exception) {
-                // stream error handled
-            }
+        Platform.runLater {
+            mediaPlayer?.volume = _volume.value.toDouble()
         }
     }
 
-    private fun stopPlayback() {
-        playbackJob?.cancel()
-        try {
-            player?.close()
-        } catch (_: Exception) {}
-        player = null
-    }
+    private fun startFxPlayback(streamUrl: String) {
+        Platform.runLater {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.dispose()
 
-    private fun startProgressTicker() {
-        progressJob?.cancel()
-        progressJob = scope.launch {
-            while (_isPlaying.value) {
-                delay(250)
-                if (_currentPositionMillis.value < _durationMillis.value) {
-                    _currentPositionMillis.value += 250
-                } else {
-                    _isPlaying.value = false
-                    break
+                val media = Media(streamUrl)
+                val player = MediaPlayer(media)
+                mediaPlayer = player
+
+                player.volume = _volume.value.toDouble()
+
+                player.currentTimeProperty().addListener { _, _, newTime ->
+                    _currentPositionMillis.value = newTime.toMillis().toLong()
                 }
+
+                player.totalDurationProperty().addListener { _, _, newDuration ->
+                    if (!newDuration.isUnknown) {
+                        _durationMillis.value = newDuration.toMillis().toLong()
+                    }
+                }
+
+                player.setOnEndOfMedia {
+                    _isPlaying.value = false
+                    _currentPositionMillis.value = 0L
+                }
+
+                player.play()
+                _isPlaying.value = true
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
