@@ -45,6 +45,8 @@ object DesktopAudioPlayer {
     private val _volume = MutableStateFlow(0.85f)
     val volume = _volume.asStateFlow()
 
+    private var previousVolume = 0.85f
+
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle = _isShuffle.asStateFlow()
 
@@ -210,10 +212,16 @@ object DesktopAudioPlayer {
     }
 
     fun seekTo(positionMillis: Long) {
-        _currentPositionMillis.value = positionMillis
+        val target = positionMillis.coerceIn(0L, _durationMillis.value)
+        _currentPositionMillis.value = target
         Platform.runLater {
-            mediaPlayer?.seek(Duration.millis(positionMillis.toDouble()))
+            mediaPlayer?.seek(Duration.millis(target.toDouble()))
         }
+    }
+
+    fun seekRelative(deltaMillis: Long) {
+        val newPos = (_currentPositionMillis.value + deltaMillis).coerceIn(0L, _durationMillis.value)
+        seekTo(newPos)
     }
 
     fun setVolume(newVolume: Float) {
@@ -221,6 +229,23 @@ object DesktopAudioPlayer {
         Platform.runLater {
             mediaPlayer?.volume = _volume.value.toDouble()
         }
+    }
+
+    fun adjustVolume(delta: Float) {
+        setVolume(_volume.value + delta)
+    }
+
+    fun toggleMute() {
+        if (_volume.value > 0f) {
+            previousVolume = _volume.value
+            setVolume(0f)
+        } else {
+            setVolume(if (previousVolume > 0f) previousVolume else 0.85f)
+        }
+    }
+
+    fun toggleLikeCurrentSong() {
+        _currentSong.value?.let { LibraryManager.toggleLike(it) }
     }
 
     private fun startFxPlayback(mediaUri: String) {
