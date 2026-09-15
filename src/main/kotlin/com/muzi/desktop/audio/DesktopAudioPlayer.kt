@@ -34,23 +34,25 @@ object DesktopAudioPlayer {
     init {
         _currentSong.value = Song(
             id = "1",
-            title = "Pal Pal",
-            artist = "Talwiinder",
-            album = "Pal Pal",
-            durationText = "3:15",
-            durationSeconds = 195,
-            thumbnailUrl = "https://c.saavncdn.com/472/Pal-Pal-Hindi-2023-20230713180425-500x500.jpg",
-            streamUrl = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3"
+            title = "Sahiba",
+            artist = "Aditya Rikhari",
+            album = "Sahiba",
+            durationText = "3:40",
+            durationSeconds = 220,
+            thumbnailUrl = "https://c.saavncdn.com/264/Sahiba-Hindi-2024-20240320144026-500x500.jpg",
+            streamUrl = "https://aac.saavncdn.com/264/4baae14979e2c608f0a05a8f4c20f12c_320.mp3"
         )
     }
 
     fun playSong(song: Song) {
         _currentSong.value = song
         _currentPositionMillis.value = 0L
-        _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 195000L
+        _durationMillis.value = if (song.durationSeconds > 0) song.durationSeconds * 1000L else 200000L
         _isPlaying.value = true
         startProgressTicker()
-        startPlayback(song.streamUrl)
+
+        val url = song.streamUrl ?: "https://aac.saavncdn.com/264/4baae14979e2c608f0a05a8f4c20f12c_320.mp3"
+        startPlayback(url)
     }
 
     fun togglePlayPause() {
@@ -64,7 +66,7 @@ object DesktopAudioPlayer {
     fun play() {
         _isPlaying.value = true
         startProgressTicker()
-        _currentSong.value?.let { startPlayback(it.streamUrl) }
+        _currentSong.value?.let { playSong(it) }
     }
 
     fun pause() {
@@ -89,9 +91,10 @@ object DesktopAudioPlayer {
             try {
                 val url = URL(streamUrl)
                 val conn = url.openConnection() as HttpURLConnection
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0")
-                conn.connectTimeout = 10000
-                conn.readTimeout = 15000
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                conn.instanceFollowRedirects = true
+                conn.connectTimeout = 8000
+                conn.readTimeout = 12000
                 conn.connect()
 
                 val bufferedStream = BufferedInputStream(conn.inputStream)
@@ -99,8 +102,8 @@ object DesktopAudioPlayer {
                 player = newPlayer
 
                 newPlayer.play()
-            } catch (_: Exception) {
-                // stream closed or error handled gracefully
+            } catch (e: Exception) {
+                // stream error handled
             }
         }
     }
