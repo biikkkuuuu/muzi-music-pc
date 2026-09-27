@@ -120,6 +120,18 @@ fun main() = application {
                             .weight(1f)
                             .fillMaxHeight()
                     ) {
+                        var showQuickMenu by remember { mutableStateOf(false) }
+
+                        if (showQuickMenu) {
+                            com.muzi.desktop.ui.components.QuickMenuDialog(
+                                onDismiss = { showQuickMenu = false },
+                                onSettingsClick = {
+                                    previousTab = currentTab
+                                    currentTab = ScreenTab.SETTINGS
+                                }
+                            )
+                        }
+
                         AnimatedContent(
                             targetState = if (currentTab == ScreenTab.PLAYER) previousTab else currentTab,
                             transitionSpec = {
@@ -133,6 +145,10 @@ fun main() = application {
                                     onSongClick = { _ ->
                                         previousTab = ScreenTab.HOME
                                         currentTab = ScreenTab.PLAYER
+                                    },
+                                    onSettingsClick = {
+                                        previousTab = currentTab
+                                        currentTab = ScreenTab.SETTINGS
                                     }
                                 )
                                 ScreenTab.SEARCH -> SearchScreen(
@@ -145,27 +161,53 @@ fun main() = application {
                                     onSongClick = { _ ->
                                         previousTab = ScreenTab.LIBRARY
                                         currentTab = ScreenTab.PLAYER
+                                    },
+                                    onSettingsClick = {
+                                        previousTab = currentTab
+                                        currentTab = ScreenTab.SETTINGS
                                     }
                                 )
                                 ScreenTab.SETTINGS -> SettingsScreen(
+                                    onBackClick = {
+                                        currentTab = previousTab
+                                    },
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 else -> {}
                             }
                         }
 
-                        // Floating Mini Player (At Bottom of main area)
+                        // Floating Mini Player & Floating Bottom Navigation Bar (Image 1 & 4 Screenshot Parity)
                         if (currentTab != ScreenTab.PLAYER) {
-                            MiniPlayerBar(
-                                song = currentSong,
-                                isPlaying = isPlaying,
-                                onTogglePlayPause = { DesktopAudioPlayer.togglePlayPause() },
-                                onClick = { 
-                                    previousTab = currentTab
-                                    currentTab = ScreenTab.PLAYER 
-                                },
-                                modifier = Modifier.align(Alignment.BottomCenter)
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (currentSong != null) {
+                                    MiniPlayerBar(
+                                        song = currentSong,
+                                        isPlaying = isPlaying,
+                                        onTogglePlayPause = { DesktopAudioPlayer.togglePlayPause() },
+                                        onClick = { 
+                                            previousTab = currentTab
+                                            currentTab = ScreenTab.PLAYER 
+                                        }
+                                    )
+                                }
+
+                                com.muzi.desktop.ui.components.FloatingBottomNavBar(
+                                    currentTab = if (currentTab == ScreenTab.PLAYER) previousTab else currentTab,
+                                    onTabSelected = {
+                                        previousTab = currentTab
+                                        currentTab = it
+                                    },
+                                    onMoreClick = {
+                                        showQuickMenu = true
+                                    }
+                                )
+                            }
                         }
                     }
                 }

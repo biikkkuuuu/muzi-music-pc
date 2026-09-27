@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onSongClick: (Song) -> Unit,
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -74,7 +75,7 @@ fun HomeScreen(
     var selectedSongForPlaylist by remember { mutableStateOf<Song?>(null) }
 
     val defaultMoodChips = listOf(
-        "Energise", "Workout", "Relax", "Commute", "Focus", "Party", "Romance", "Feel good", "Sad", "Sleep"
+        "Feel good", "Relax", "Romance", "Energize", "Workout", "Commute", "Party", "Focus", "Sad", "Sleep"
     )
 
     // Initial Load (Fresh Install / Static Feed)
@@ -141,67 +142,88 @@ fun HomeScreen(
             .fillMaxSize()
             .background(PureBlack)
             .padding(horizontal = 36.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp)
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
-        // App Header & Mood Chips Row (Always visible)
+        // App Header: "Muzi Music" + 4 Action Icons (Image 4 Parity)
         item {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Muzi",
+                    text = "Muzi Music",
                     color = TextPrimary,
-                    fontSize = 26.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(18.dp))
 
-                val chips = homeFeed?.chips
-                if (!chips.isNullOrEmpty()) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(chips) { chip ->
-                            val isSelected = chip.title == selectedChip?.title
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) animatedAccent else ChipBackground)
-                                    .clickable { selectedChip = if (isSelected) null else chip }
-                                    .padding(horizontal = 18.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = chip.title,
-                                    color = if (isSelected) Color.White else TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.History, "History", tint = TextPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.TrendingUp, "Stats", tint = TextPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.Group, "Listen Together", tint = TextPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, "Settings", tint = TextPrimary, modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+        }
+
+        // Mood Filter Chips Row
+        item {
+            val chips = homeFeed?.chips
+            if (!chips.isNullOrEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(chips) { chip ->
+                        val isSelected = chip.title == selectedChip?.title
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSelected) MuziBlueContainer else ChipBackground)
+                                .clickable { selectedChip = if (isSelected) null else chip }
+                                .padding(horizontal = 18.dp, vertical = 9.dp)
+                        ) {
+                            Text(
+                                text = chip.title,
+                                color = if (isSelected) Color.White else TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
                     }
-                } else {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(defaultMoodChips) { chipName ->
-                            val isSelected = chipName == selectedChip?.title
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (isSelected) animatedAccent else ChipBackground)
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            isLoadingFeed = true
-                                            fallbackQuickPicks = YouTubeMusicService.search("$chipName Songs")
-                                            isLoadingFeed = false
-                                        }
+                }
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(defaultMoodChips) { chipName ->
+                        val isSelected = chipName == selectedChip?.title
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSelected) MuziBlueContainer else ChipBackground)
+                                .clickable {
+                                    coroutineScope.launch {
+                                        isLoadingFeed = true
+                                        fallbackQuickPicks = YouTubeMusicService.search("$chipName Songs")
+                                        isLoadingFeed = false
                                     }
-                                    .padding(horizontal = 18.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = chipName,
-                                    color = if (isSelected) Color.White else TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
+                                }
+                                .padding(horizontal = 18.dp, vertical = 9.dp)
+                        ) {
+                            Text(
+                                text = chipName,
+                                color = if (isSelected) Color.White else TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
                     }
                 }
@@ -471,14 +493,32 @@ fun HomeScreen(
         if (selectedChip == null && similarSongs.isNotEmpty() && similarSeed != null) {
             item {
                 Column {
-                    Text(
-                        text = "Similar to ${similarSeed!!.title}",
-                        color = TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Similar to",
+                                color = TextSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = similarSeed!!.artist.ifBlank { similarSeed!!.title },
+                                color = MuziBlue,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "More",
+                            tint = MuziBlue,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(14.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         items(similarSongs.take(10)) { song ->

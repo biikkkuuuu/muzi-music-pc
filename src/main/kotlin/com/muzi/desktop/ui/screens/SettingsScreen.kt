@@ -1,11 +1,13 @@
-﻿package com.muzi.desktop.ui.screens
+package com.muzi.desktop.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,196 +24,235 @@ import java.io.File
 
 @Composable
 fun SettingsScreen(
+    onBackClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+
     val cacheDir = remember { File(System.getProperty("user.home"), ".muzi/cache/audio") }
     var cacheSizeBytes by remember {
-        mutableLongStateOf(
-            cacheDir.listFiles()?.sumOf { it.length() } ?: 0L
-        )
+        mutableLongStateOf(cacheDir.listFiles()?.sumOf { it.length() } ?: 0L)
     }
-    var selectedQuality by remember { mutableStateOf("High (128-256 kbps AAC)") }
-    var selectedPreset by remember { mutableStateOf("Dynamic (Album Art)") }
     var clearCacheSuccess by remember { mutableStateOf(false) }
 
-    val qualities = listOf("Standard (128 kbps)", "High (128-256 kbps AAC)", "Ultra (Lossless Op)")
-    val presets = listOf("Dynamic (Album Art)", "Pure AMOLED Black", "Deep Obsidian")
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(PureBlack)
-            .padding(horizontal = 48.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        item {
-            Text(
-                text = "Settings",
-                color = TextPrimary,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // Section: Storage & Cache
-        item {
-            SettingsCard(title = "Storage & Offline Cache", icon = Icons.Default.Storage) {
+    // Dialog for Storage / Cache
+    if (selectedCategory == "Storage") {
+        AlertDialog(
+            onDismissRequest = { selectedCategory = null },
+            title = { Text("Storage & Cache", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
                 val mb = "%.1f MB".format(cacheSizeBytes / (1024.0 * 1024.0))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Cached Audio Files", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text("Songs stored locally for instant offline playback ($mb)", color = TextSecondary, fontSize = 13.sp)
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Cached Audio Files: $mb", color = TextSecondary, fontSize = 14.sp)
+                    Text("Offline cached files enable instant zero-bandwidth playback.", color = TextSecondary, fontSize = 12.sp)
                     Button(
                         onClick = {
                             cacheDir.listFiles()?.forEach { it.delete() }
                             cacheSizeBytes = cacheDir.listFiles()?.sumOf { it.length() } ?: 0L
                             clearCacheSuccess = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MuziBlue),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(if (clearCacheSuccess) "Cleared!" else "Clear Cache", color = Color.White, fontSize = 13.sp)
+                        Text(if (clearCacheSuccess) "Cleared!" else "Clear Cache Now", color = Color.White)
                     }
                 }
-            }
-        }
-
-        // Section: Audio Quality
-        item {
-            SettingsCard(title = "Audio Quality & Streaming", icon = Icons.Default.Equalizer) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Streaming Audio Format", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Higher bitrate ensures crystal-clear highs and deep bass", color = TextSecondary, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        qualities.forEach { q ->
-                            val isSelected = q == selectedQuality
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isSelected) MuziAccent else Color(0xFF222222))
-                                    .clickable { selectedQuality = q }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = q,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedCategory = null }) {
+                    Text("Close", color = MuziBlue)
                 }
-            }
-        }
+            },
+            containerColor = Color(0xFF1E1E22)
+        )
+    }
 
-        // Section: Appearance & Theme
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(PureBlack)
+            .padding(horizontal = 36.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        // Top Bar: Back Arrow & "Settings" (Image 2 Parity)
         item {
-            SettingsCard(title = "Appearance & Aesthetics", icon = Icons.Default.Palette) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Theme Style", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Song-adaptive ambient gradient vs Pure AMOLED black", color = TextSecondary, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        presets.forEach { p ->
-                            val isSelected = p == selectedPreset
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isSelected) MuziAccent else Color(0xFF222222))
-                                    .clickable { selectedPreset = p }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = p,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Settings",
+                    color = TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
-        // Section: Keyboard Shortcuts Cheat Sheet
+        // Search Bar Pill (Image 2 Parity)
         item {
-            SettingsCard(title = "Desktop Keyboard Shortcuts", icon = Icons.Default.Keyboard) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ShortcutRow("Spacebar", "Play / Pause playback")
-                    ShortcutRow("Left / Right Arrow", "Seek 5 seconds backward / forward")
-                    ShortcutRow("Ctrl + Left / Right", "Play previous / next song")
-                    ShortcutRow("Up / Down Arrow", "Volume Up / Down (5% step)")
-                    ShortcutRow("L", "Like (??) current song into Favourites")
-                    ShortcutRow("M", "Mute / Unmute audio")
-                }
-            }
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                placeholder = {
+                    Text("Search", color = Color(0xFF888888), fontSize = 15.sp)
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF888888),
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                shape = RoundedCornerShape(28.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedContainerColor = Color(0xFF16161A),
+                    unfocusedContainerColor = Color(0xFF16161A),
+                    focusedBorderColor = MuziBlue,
+                    unfocusedBorderColor = Color(0xFF2C2C30)
+                )
+            )
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
-        // Section: About
+        // Grouped Settings Cards (Image 2 Parity)
         item {
-            SettingsCard(title = "About Muzi Desktop", icon = Icons.Default.Info) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Muzi Music for Windows (PC)", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Version 1.2.0 • Standalone Desktop Edition", color = TextSecondary, fontSize = 13.sp)
-                    Text("Engine: Native YouTube Music / InnerTube Stream Pipeline", color = TextSecondary, fontSize = 13.sp)
-                    Text("Created for Vikash Rana • GitHub: biikkkuuuu/muzi-music-pc", color = TextSecondary, fontSize = 13.sp)
-                }
-            }
-        }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF232328))
+            ) {
+                SettingsCategoryItem(
+                    icon = Icons.Default.Palette,
+                    title = "Appearance",
+                    subtitle = "Themes, colors, and UI layout",
+                    onClick = { selectedCategory = "Appearance" }
+                )
+                SettingsDivider()
 
-        item {
-            Spacer(modifier = Modifier.height(40.dp))
+                SettingsCategoryItem(
+                    icon = Icons.Default.PlayArrow,
+                    title = "Player and audio",
+                    subtitle = "Playback, quality, and equalizer",
+                    onClick = { selectedCategory = "Player" }
+                )
+                SettingsDivider()
+
+                SettingsCategoryItem(
+                    icon = Icons.Default.Group,
+                    title = "Listen Together",
+                    subtitle = "Sync playback with friends",
+                    onClick = { selectedCategory = "ListenTogether" }
+                )
+                SettingsDivider()
+
+                SettingsCategoryItem(
+                    icon = Icons.Default.Language,
+                    title = "Content",
+                    subtitle = "Language, region, and providers",
+                    onClick = { selectedCategory = "Content" }
+                )
+                SettingsDivider()
+
+                SettingsCategoryItem(
+                    icon = Icons.Default.Shield,
+                    title = "Privacy",
+                    subtitle = "History and tracking",
+                    onClick = { selectedCategory = "Privacy" }
+                )
+                SettingsDivider()
+
+                SettingsCategoryItem(
+                    icon = Icons.Default.Storage,
+                    title = "Storage",
+                    subtitle = "Cache and downloads",
+                    onClick = { selectedCategory = "Storage" }
+                )
+                SettingsDivider()
+
+                SettingsCategoryItem(
+                    icon = Icons.Default.CloudSync,
+                    title = "Backup and restore",
+                    subtitle = "Backup playlists and settings",
+                    onClick = { selectedCategory = "Backup" }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SettingsCard(
-    title: String,
+private fun SettingsCategoryItem(
     icon: ImageVector,
-    content: @Composable ColumnScope.() -> Unit
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF141414))
-            .padding(20.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(imageVector = icon, contentDescription = title, tint = MuziAccent, modifier = Modifier.size(22.dp))
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(text = title, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        content()
-    }
-}
-
-@Composable
-private fun ShortcutRow(key: String, description: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF262626))
-                .padding(horizontal = 10.dp, vertical = 4.dp)
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(MuziBlueContainer),
+            contentAlignment = Alignment.Center
         ) {
-            Text(text = key, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = MuziBlue,
+                modifier = Modifier.size(22.dp)
+            )
         }
-        Text(text = description, color = TextSecondary, fontSize = 13.sp)
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = subtitle,
+                color = TextSecondary,
+                fontSize = 13.sp
+            )
+        }
     }
+}
+
+@Composable
+private fun SettingsDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(Color(0x1AFFFFFF))
+    )
 }
