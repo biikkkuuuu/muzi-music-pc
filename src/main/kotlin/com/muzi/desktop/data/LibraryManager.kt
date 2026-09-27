@@ -161,7 +161,7 @@ object LibraryManager {
     // Get offline downloaded songs from disk
     fun getDownloadedSongs(): List<Song> {
         if (!cacheDir.exists()) return emptyList()
-        val cachedFiles = cacheDir.listFiles { f -> f.extension == "mp4" && f.length() > 50_000 } ?: return emptyList()
+        val cachedFiles = cacheDir.listFiles { f -> (f.extension == "m4a" || f.extension == "mp4") && f.length() > 50_000 } ?: return emptyList()
         val cachedIds = cachedFiles.map { it.nameWithoutExtension }.toSet()
 
         // Match against known songs from history or liked

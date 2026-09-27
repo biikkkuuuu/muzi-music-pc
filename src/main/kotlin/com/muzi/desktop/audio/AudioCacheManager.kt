@@ -21,7 +21,7 @@ object AudioCacheManager {
         .build()
 
     suspend fun getAudioFile(songId: String, streamUrlProvider: suspend () -> String?): File? = withContext(Dispatchers.IO) {
-        val targetFile = File(cacheDir, "$songId.mp4")
+        val targetFile = File(cacheDir, "$songId.m4a")
         if (targetFile.exists() && targetFile.length() > 50_000) {
             println("[AudioCacheManager] Cache hit for $songId (${targetFile.length()} bytes)")
             return@withContext targetFile
@@ -34,9 +34,7 @@ object AudioCacheManager {
             println("[AudioCacheManager] Downloading audio for $songId from YouTube...")
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
-                .header("Origin", "https://www.youtube.com")
-                .header("Referer", "https://www.youtube.com/")
+                .header("User-Agent", "com.google.android.youtube/21.03.38 (Linux; U; Android 14) gzip")
                 .build()
 
             client.newCall(request).execute().use { response ->

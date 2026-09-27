@@ -45,6 +45,7 @@ dependencies {
     implementation("com.github.TeamNewPipe:nanojson:c7a6c1c08d16b6d5ecded34758e6415e07be2166")
     
     // JavaFX Media for native high quality streaming on Windows
+    implementation("dev.arbjerg:lavaplayer:2.2.3")
     implementation("org.openjfx:javafx-media:21.0.2:win")
     implementation("org.openjfx:javafx-base:21.0.2:win")
     implementation("org.openjfx:javafx-graphics:21.0.2:win")
@@ -52,6 +53,12 @@ dependencies {
     // Image Loading in Compose Desktop (Coil 3 Multiplatform)
     implementation("io.coil-kt.coil3:coil-compose:3.1.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.1.0")
+}
+
+
+tasks.register<JavaExec>("runMuziServer") {
+    mainClass.set("com.muzi.desktop.server.MuziApiServer")
+    classpath = sourceSets["main"].runtimeClasspath
 }
 
 tasks.register<JavaExec>("runDebugStream") {
@@ -67,7 +74,7 @@ compose.desktop {
             packageName = "Muzi"
             packageVersion = "1.0.0"
             description = "Muzi Music - Beautiful Windows Desktop Music Player"
-            copyright = "© 2026 biikkkuuuu"
+            copyright = " 2026 biikkkuuuu"
             windows {
                 menuGroup = "Muzi"
                 upgradeUuid = "4d6d601b-9f93-4a6c-a45e-998811223344"
@@ -75,3 +82,4 @@ compose.desktop {
         }
     }
 }
+

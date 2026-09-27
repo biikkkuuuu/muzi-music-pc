@@ -5,14 +5,26 @@ import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.DynamicColorExtractor
-import javafx.application.Platform
-import javafx.scene.media.Media
-import javafx.scene.media.MediaPlayer
-import javafx.util.Duration
+import com.sedmelluq.discord.lavaplayer.format.AudioDataFormatTools
+import com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream
+import com.sedmelluq.discord.lavaplayer.format.StandardAudioDataFormats
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager
+import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter
+import com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager
+import com.sedmelluq.discord.lavaplayer.source.local.LocalAudioSourceManager
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException
+import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.io.File
+import java.io.InputStream
+import javax.sound.sampled.AudioSystem
+import javax.sound.sampled.DataLine
+import javax.sound.sampled.SourceDataLine
 
 enum class RepeatMode {
     OFF, ALL, ONE
@@ -53,19 +65,90 @@ object DesktopAudioPlayer {
     private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
     val repeatMode = _repeatMode.asStateFlow()
 
-    // Dynamic color extracted from album art (Android Muzi signature feature)
+    // Dynamic color extracted from album art
     private val _dynamicThemeColor = MutableStateFlow(Color(0xFFE50914))
     val dynamicThemeColor = _dynamicThemeColor.asStateFlow()
 
-    private var mediaPlayer: MediaPlayer? = null
-    private var isFxInitialized = false
+    // PC Native Audio via Lavaplayer & Windows Sound Architecture
+    private val outputFormat = StandardAudioDataFormats.COMMON_PCM_S16_BE
+    private val playerManager: DefaultAudioPlayerManager = DefaultAudioPlayerManager().apply {
+        configuration.outputFormat = outputFormat
+        registerSourceManager(LocalAudioSourceManager())
+        registerSourceManager(HttpAudioSourceManager())
+    }
+
+    private val audioPlayer: AudioPlayer = playerManager.createPlayer()
+    private var audioLine: SourceDataLine? = null
+    private var audioStream: InputStream? = null
 
     init {
+        audioPlayer.volume = (_volume.value * 100).toInt().coerceIn(0, 100)
+
+        audioPlayer.addListener(object : AudioEventAdapter() {
+            override fun onTrackEnd(player: AudioPlayer, track: AudioTrack, endReason: AudioTrackEndReason) {
+                if (endReason.mayStartNext) {
+                    scope.launch {
+                        playNext()
+                    }
+                }
+            }
+
+            override fun onTrackException(player: AudioPlayer, track: AudioTrack, exception: FriendlyException) {
+                println("[DesktopAudioPlayer] Track exception: ${exception.message}")
+                _isPlaying.value = false
+                _isBuffering.value = false
+            }
+        })
+
+        startHardwareAudioThread()
+        startPositionWatcher()
+    }
+
+    private fun startHardwareAudioThread() {
+        val javaFormat = AudioDataFormatTools.toAudioFormat(outputFormat)
         try {
-            Platform.startup {}
-            isFxInitialized = true
-        } catch (_: Exception) {
-            isFxInitialized = true
+            val lineInfo = DataLine.Info(SourceDataLine::class.java, javaFormat)
+            val line = AudioSystem.getLine(lineInfo) as SourceDataLine
+            line.open(javaFormat, 1024 * 32)
+            line.start()
+            audioLine = line
+            println("[DesktopAudioPlayer] Windows PC audio line opened: $javaFormat")
+        } catch (e: Exception) {
+            println("[DesktopAudioPlayer] Error opening audio line: ${e.message}")
+        }
+
+        audioStream = AudioPlayerInputStream.createStream(audioPlayer, outputFormat, 10000L, false)
+
+        scope.launch(Dispatchers.IO) {
+            val buffer = ByteArray(1024 * 4)
+            while (isActive) {
+                if (_isPlaying.value && !audioPlayer.isPaused) {
+                    val stream = audioStream
+                    val count = stream?.read(buffer, 0, buffer.size) ?: -1
+                    if (count > 0) {
+                        audioLine?.write(buffer, 0, count)
+                    } else {
+                        delay(4)
+                    }
+                } else {
+                    delay(20)
+                }
+            }
+        }
+    }
+
+    private fun startPositionWatcher() {
+        scope.launch(Dispatchers.Default) {
+            while (isActive) {
+                val track = audioPlayer.playingTrack
+                if (track != null && _isPlaying.value && !audioPlayer.isPaused) {
+                    _currentPositionMillis.value = track.position
+                    if (track.duration > 0) {
+                        _durationMillis.value = track.duration
+                    }
+                }
+                delay(200)
+            }
         }
     }
 
@@ -78,7 +161,6 @@ object DesktopAudioPlayer {
 
         LibraryManager.addToHistory(song)
 
-        // Dynamically extract album art color
         scope.launch {
             val color = DynamicColorExtractor.extractFromUrl(song.thumbnailUrl)
             _dynamicThemeColor.value = color
@@ -95,7 +177,6 @@ object DesktopAudioPlayer {
             } else {
                 _queue.value = listOf(song)
                 _queueIndex.value = 0
-                // Fetch endless radio queue in background (Muzi Android behavior)
                 scope.launch {
                     val radioSongs = YouTubeMusicService.fetchRadioQueue(song.id)
                     if (radioSongs.isNotEmpty()) {
@@ -111,14 +192,19 @@ object DesktopAudioPlayer {
                 val audioFile = AudioCacheManager.getAudioFile(song.id) {
                     song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
                 }
-                _isBuffering.value = false
 
-                if (audioFile != null && audioFile.exists()) {
-                    val mediaUri = audioFile.toURI().toString()
-                    _currentSong.value = song.copy(streamUrl = mediaUri)
-                    startFxPlayback(mediaUri)
+                val source = if (audioFile != null && audioFile.exists() && audioFile.length() > 50000) {
+                    audioFile.absolutePath
                 } else {
-                    println("[DesktopAudioPlayer] Failed to obtain audio file for ${song.title}")
+                    song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
+                }
+
+                if (source != null) {
+                    println("[DesktopAudioPlayer] Starting playback for ${song.title}: $source")
+                    loadAndPlay(source)
+                } else {
+                    println("[DesktopAudioPlayer] Failed to resolve audio for ${song.title}")
+                    _isBuffering.value = false
                     _isPlaying.value = false
                 }
             } catch (e: Exception) {
@@ -128,6 +214,42 @@ object DesktopAudioPlayer {
                 _isPlaying.value = false
             }
         }
+    }
+
+    private fun loadAndPlay(source: String) {
+        audioPlayer.stopTrack()
+        playerManager.loadItem(source, object : AudioLoadResultHandler {
+            override fun trackLoaded(track: AudioTrack) {
+                println("[DesktopAudioPlayer] Track loaded: ${track.info.title} duration=${track.duration}ms")
+                audioPlayer.playTrack(track)
+                audioPlayer.isPaused = false
+                _isPlaying.value = true
+                _isBuffering.value = false
+                if (track.duration > 0) {
+                    _durationMillis.value = track.duration
+                }
+            }
+
+            override fun playlistLoaded(playlist: AudioPlaylist) {
+                val track = playlist.tracks.firstOrNull() ?: return
+                audioPlayer.playTrack(track)
+                audioPlayer.isPaused = false
+                _isPlaying.value = true
+                _isBuffering.value = false
+            }
+
+            override fun noMatches() {
+                println("[DesktopAudioPlayer] No audio matches found for source")
+                _isBuffering.value = false
+                _isPlaying.value = false
+            }
+
+            override fun loadFailed(e: FriendlyException) {
+                println("[DesktopAudioPlayer] Load failed: ${e.message}")
+                _isBuffering.value = false
+                _isPlaying.value = false
+            }
+        })
     }
 
     fun playSongAt(index: Int) {
@@ -199,24 +321,18 @@ object DesktopAudioPlayer {
 
     fun play() {
         _isPlaying.value = true
-        Platform.runLater {
-            mediaPlayer?.play()
-        }
+        audioPlayer.isPaused = false
     }
 
     fun pause() {
         _isPlaying.value = false
-        Platform.runLater {
-            mediaPlayer?.pause()
-        }
+        audioPlayer.isPaused = true
     }
 
     fun seekTo(positionMillis: Long) {
         val target = positionMillis.coerceIn(0L, _durationMillis.value)
         _currentPositionMillis.value = target
-        Platform.runLater {
-            mediaPlayer?.seek(Duration.millis(target.toDouble()))
-        }
+        audioPlayer.playingTrack?.position = target
     }
 
     fun seekRelative(deltaMillis: Long) {
@@ -225,10 +341,9 @@ object DesktopAudioPlayer {
     }
 
     fun setVolume(newVolume: Float) {
-        _volume.value = newVolume.coerceIn(0f, 1f)
-        Platform.runLater {
-            mediaPlayer?.volume = _volume.value.toDouble()
-        }
+        val clamped = newVolume.coerceIn(0f, 1f)
+        _volume.value = clamped
+        audioPlayer.volume = (clamped * 100).toInt()
     }
 
     fun adjustVolume(delta: Float) {
@@ -246,56 +361,5 @@ object DesktopAudioPlayer {
 
     fun toggleLikeCurrentSong() {
         _currentSong.value?.let { LibraryManager.toggleLike(it) }
-    }
-
-    private fun startFxPlayback(mediaUri: String) {
-        Platform.runLater {
-            try {
-                mediaPlayer?.stop()
-                mediaPlayer?.dispose()
-
-                println("[DesktopAudioPlayer] Loading media: $mediaUri")
-                val media = Media(mediaUri)
-                media.setOnError {
-                    println("[DesktopAudioPlayer] Media error: ${media.error?.message}")
-                }
-
-                val player = MediaPlayer(media)
-                mediaPlayer = player
-
-                player.volume = _volume.value.toDouble()
-
-                player.setOnError {
-                    println("[DesktopAudioPlayer] Player error: ${player.error?.message}")
-                }
-
-                player.currentTimeProperty().addListener { _, _, newTime ->
-                    _currentPositionMillis.value = newTime.toMillis().toLong()
-                }
-
-                player.totalDurationProperty().addListener { _, _, newDuration ->
-                    if (!newDuration.isUnknown) {
-                        _durationMillis.value = newDuration.toMillis().toLong()
-                    }
-                }
-
-                player.setOnReady {
-                    println("[DesktopAudioPlayer] Player is ready! Duration: ${player.totalDuration.toSeconds()}s")
-                    player.play()
-                    _isPlaying.value = true
-                }
-
-                // Autoplay next song from radio queue when current song finishes!
-                player.setOnEndOfMedia {
-                    playNext()
-                }
-
-                player.play()
-                _isPlaying.value = true
-            } catch (e: Exception) {
-                println("[DesktopAudioPlayer] Error starting playback: ${e.message}")
-                e.printStackTrace()
-            }
-        }
     }
 }

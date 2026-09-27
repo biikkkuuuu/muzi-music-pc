@@ -124,44 +124,42 @@ object YouTubeMusicService {
         emptyList()
     }
 
-    // Guaranteed Full Length YouTube Stream Playback
+    // Guaranteed Full Length YouTube Stream Playback for Windows PC
     suspend fun resolveStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
+        // 1. Try ANDROID_NO_SDK (Most reliable for direct unthrottled streams on PC)
+        try {
+            val res = YouTube.player(videoId = videoId, client = com.music.innertube.models.YouTubeClient.ANDROID_NO_SDK).getOrNull()
+            val url = res?.streamingData?.formats?.firstOrNull { it.itag == 18 && it.url != null }?.url
+                ?: res?.streamingData?.adaptiveFormats?.firstOrNull { it.itag == 140 && it.url != null }?.url
+                ?: res?.streamingData?.adaptiveFormats?.firstOrNull { it.url != null && it.mimeType?.startsWith("audio/") == true }?.url
+            if (url != null) return@withContext url
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] ANDROID_NO_SDK error: ${e.message}")
+        }
+
+        // 2. Try IOS client
+        try {
+            val resIos = YouTube.player(videoId = videoId, client = com.music.innertube.models.YouTubeClient.IOS).getOrNull()
+            val urlIos = resIos?.streamingData?.adaptiveFormats?.firstOrNull { it.itag == 140 && it.url != null }?.url
+                ?: resIos?.streamingData?.adaptiveFormats?.firstOrNull { it.url != null && it.mimeType?.startsWith("audio/") == true }?.url
+            if (urlIos != null) return@withContext urlIos
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] IOS client error: ${e.message}")
+        }
+
+        // 3. Fallback to NewPipe
         ensureNewPipe()
         try {
             val streamInfo = StreamInfo.getInfo(
                 NewPipe.getService(0),
                 "https://www.youtube.com/watch?v=$videoId"
             )
-
-            // 1. Audio stream if available (M4A / AAC preferred)
-            val m4aAudio = streamInfo.audioStreams.firstOrNull { it.format?.suffix?.equals("m4a", ignoreCase = true) == true }
-            if (m4aAudio != null && !m4aAudio.content.isNullOrBlank()) {
-                return@withContext m4aAudio.content
-            }
-
             val anyAudio = streamInfo.audioStreams.firstOrNull { !it.content.isNullOrBlank() }
             if (anyAudio != null) {
                 return@withContext anyAudio.content
             }
-
-            // 2. Video+Audio MP4 stream with sound (itag 18 is 360p MP4 with AAC, fast ~5-8MB)
-            val mp4Medium = streamInfo.videoStreams.firstOrNull { it.itag == 18 && !it.content.isNullOrBlank() }
-            if (mp4Medium != null) {
-                return@withContext mp4Medium.content
-            }
-
-            // 3. Any non-video-only stream (i.e. contains audio)
-            val muxedStream = streamInfo.videoStreams.firstOrNull { !it.isVideoOnly && !it.content.isNullOrBlank() }
-            if (muxedStream != null) {
-                return@withContext muxedStream.content
-            }
-
-            val fallbackVideo = streamInfo.videoStreams.firstOrNull { !it.content.isNullOrBlank() }
-            if (fallbackVideo != null) {
-                return@withContext fallbackVideo.content
-            }
         } catch (e: Exception) {
-            println("[YouTubeMusicService] Stream resolution error for $videoId: ${e.message}")
+            println("[YouTubeMusicService] NewPipe error for $videoId: ${e.message}")
         }
 
         null
