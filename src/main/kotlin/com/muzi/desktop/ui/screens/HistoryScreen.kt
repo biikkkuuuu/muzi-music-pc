@@ -29,6 +29,7 @@ import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.components.AddToPlaylistDialog
 import com.muzi.desktop.ui.components.SongOptionsDialog
+import com.muzi.desktop.ui.components.SongListItem
 import com.muzi.desktop.ui.theme.*
 
 /**
@@ -189,74 +190,18 @@ fun HistoryScreen(
             ) {
                 items(filteredHistory) { song ->
                     val isCurrent = currentPlayingSong?.id == song.id
-                    val isLiked = LibraryManager.isLiked(song.id)
+                    val isPlaying = isCurrent && DesktopAudioPlayer.isPlaying.value
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isCurrent) MuziBlueContainer.copy(alpha = 0.35f) else Color.Transparent)
-                            .clickable {
-                                DesktopAudioPlayer.playSong(song, filteredHistory)
-                                onSongClick(song)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(
-                            model = song.thumbnailUrl,
-                            contentDescription = song.title,
-                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = song.title,
-                                color = if (isCurrent) MuziAccent else TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = song.artist,
-                                color = TextSecondary,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Text(
-                            text = song.durationText,
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(horizontal = 14.dp)
-                        )
-
-                        IconButton(
-                            onClick = { LibraryManager.toggleLike(song) },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Like",
-                                tint = if (isLiked) MuziAccent else Color(0x66FFFFFF),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { selectedSongForOptions = song },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(Icons.Default.MoreVert, "Options", tint = TextSecondary, modifier = Modifier.size(18.dp))
-                        }
-                    }
+                    SongListItem(
+                        song = song,
+                        isActive = isCurrent,
+                        isPlaying = isPlaying,
+                        onClick = {
+                            DesktopAudioPlayer.playSong(song, filteredHistory)
+                            onSongClick(song)
+                        },
+                        onOptionsClick = { selectedSongForOptions = song }
+                    )
                 }
             }
         }

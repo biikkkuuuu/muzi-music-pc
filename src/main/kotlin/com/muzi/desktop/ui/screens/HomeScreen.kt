@@ -37,6 +37,9 @@ import com.muzi.desktop.model.ChartItem
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.components.AddToPlaylistDialog
 import com.muzi.desktop.ui.components.SongOptionsDialog
+import com.muzi.desktop.ui.components.NavigationTitle
+import com.muzi.desktop.ui.components.SongListItem
+import com.muzi.desktop.ui.components.GridItem
 import com.muzi.desktop.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -158,8 +161,9 @@ fun HomeScreen(
             ) {
                 Text(
                     text = "Muzi Music",
+                    fontFamily = BbhBartle,
                     color = TextPrimary,
-                    fontSize = 28.sp,
+                    fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -242,13 +246,16 @@ fun HomeScreen(
         if (selectedChip == null && speedDialSongs.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Speed dial",
-                        color = TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                    NavigationTitle(
+                        title = "Speed dial",
+                        onPlayAllClick = {
+                            speedDialSongs.firstOrNull()?.let {
+                                DesktopAudioPlayer.playSong(it, speedDialSongs)
+                                onSongClick(it)
+                            }
+                        }
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     val chunked = speedDialSongs.chunked(3)
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -437,13 +444,16 @@ fun HomeScreen(
         if (historySongs.isNotEmpty() && selectedChip == null) {
             item {
                 Column {
-                    Text(
-                        text = "Keep listening",
-                        color = TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                    NavigationTitle(
+                        title = "Keep listening",
+                        onPlayAllClick = {
+                            historySongs.firstOrNull()?.let {
+                                DesktopAudioPlayer.playSong(it, historySongs)
+                                onSongClick(it)
+                            }
+                        }
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         items(historySongs.take(12)) { song ->
                             Column(
@@ -498,36 +508,13 @@ fun HomeScreen(
         if (selectedChip == null && similarSongs.isNotEmpty() && similarSeed != null) {
             item {
                 Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onArtistClick(similarSeed!!.artist, similarSeed!!.artist, similarSeed!!.thumbnailUrl)
-                            },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Similar to",
-                                color = TextSecondary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = similarSeed!!.artist.ifBlank { similarSeed!!.title },
-                                color = MuziBlue,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                    NavigationTitle(
+                        label = "Similar to",
+                        title = similarSeed!!.artist.ifBlank { similarSeed!!.title },
+                        onClick = {
+                            onArtistClick(similarSeed!!.artist, similarSeed!!.artist, similarSeed!!.thumbnailUrl)
                         }
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
-                            contentDescription = "More",
-                            tint = MuziBlue,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    )
                     Spacer(modifier = Modifier.height(14.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         items(similarSongs.take(10)) { song ->
@@ -583,13 +570,16 @@ fun HomeScreen(
         if (selectedChip == null && forgottenFavorites.isNotEmpty()) {
             item {
                 Column {
-                    Text(
-                        text = "Forgotten favorites",
-                        color = TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                    NavigationTitle(
+                        title = "Forgotten favorites",
+                        onPlayAllClick = {
+                            forgottenFavorites.firstOrNull()?.let {
+                                DesktopAudioPlayer.playSong(it, forgottenFavorites)
+                                onSongClick(it)
+                            }
+                        }
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         items(forgottenFavorites.take(8)) { song ->
                             Column(
@@ -725,31 +715,14 @@ fun HomeScreen(
                 if (songItems.isNotEmpty()) {
                     item {
                         Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = section.title,
-                                    color = TextPrimary,
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Button(
-                                    onClick = {
-                                        DesktopAudioPlayer.playSong(songItems.first(), songItems)
-                                        onSongClick(songItems.first())
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
-                                    shape = RoundedCornerShape(16.dp)
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Play all", color = TextPrimary, fontSize = 13.sp)
+                            NavigationTitle(
+                                title = section.title,
+                                onPlayAllClick = {
+                                    DesktopAudioPlayer.playSong(songItems.first(), songItems)
+                                    onSongClick(songItems.first())
                                 }
-                            }
-                            Spacer(modifier = Modifier.height(14.dp))
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             val chunked = songItems.take(16).chunked(4)
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -813,13 +786,8 @@ fun HomeScreen(
                 } else {
                     item {
                         Column {
-                            Text(
-                                text = section.title,
-                                color = TextPrimary,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
+                            NavigationTitle(title = section.title)
+                            Spacer(modifier = Modifier.height(10.dp))
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 items(section.items) { item ->
                                     val (title, subtitle, thumb) = when (item) {

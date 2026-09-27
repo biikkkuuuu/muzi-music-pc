@@ -31,6 +31,8 @@ import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.components.AddToPlaylistDialog
 import com.muzi.desktop.ui.components.SongOptionsDialog
+import com.muzi.desktop.ui.components.SongListItem
+import com.muzi.desktop.ui.components.NavigationTitle
 import com.muzi.desktop.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -346,47 +348,19 @@ fun SearchScreen(
 
                 // Songs List
                 items(if (selectedFilter == "All" && results.size > 1) results.drop(1) else results) { song ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable {
-                                DesktopAudioPlayer.playSong(song, results)
-                                onSongClick(song)
-                            }
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(
-                            model = song.thumbnailUrl,
-                            contentDescription = song.title,
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = song.title,
-                                color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "${song.artist} • ${song.durationText}",
-                                color = TextSecondary,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(onClick = { selectedSongForOptions = song }) {
-                            Icon(Icons.Default.MoreVert, "Options", tint = TextSecondary, modifier = Modifier.size(20.dp))
-                        }
-                    }
+                    val isCurrent = DesktopAudioPlayer.currentSong.value?.id == song.id
+                    val isPlaying = isCurrent && DesktopAudioPlayer.isPlaying.value
+
+                    SongListItem(
+                        song = song,
+                        isActive = isCurrent,
+                        isPlaying = isPlaying,
+                        onClick = {
+                            DesktopAudioPlayer.playSong(song, results)
+                            onSongClick(song)
+                        },
+                        onOptionsClick = { selectedSongForOptions = song }
+                    )
                 }
             }
         }

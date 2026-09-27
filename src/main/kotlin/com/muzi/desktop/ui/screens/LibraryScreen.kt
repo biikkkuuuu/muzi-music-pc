@@ -27,6 +27,7 @@ import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.data.UserPlaylist
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.components.SongOptionsDialog
+import com.muzi.desktop.ui.components.SongListItem
 import com.muzi.desktop.ui.theme.*
 
 enum class LibraryTab {
@@ -659,41 +660,14 @@ private fun LibrarySongRow(
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = song.thumbnailUrl,
-            contentDescription = song.title,
-            modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                color = TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "${song.artist} • ${song.durationText}",
-                color = TextSecondary,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        IconButton(onClick = onOptionsClick) {
-            Icon(Icons.Default.MoreVert, "Options", tint = TextSecondary, modifier = Modifier.size(18.dp))
-        }
-    }
+    val isCurrent = DesktopAudioPlayer.currentSong.value?.id == song.id
+    val isPlaying = isCurrent && DesktopAudioPlayer.isPlaying.value
+
+    SongListItem(
+        song = song,
+        isActive = isCurrent,
+        isPlaying = isPlaying,
+        onClick = onClick,
+        onOptionsClick = onOptionsClick
+    )
 }
