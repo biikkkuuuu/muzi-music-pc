@@ -36,6 +36,81 @@ fun SettingsScreen(
     }
     var clearCacheSuccess by remember { mutableStateOf(false) }
 
+    var audioQualityHigh by remember { mutableStateOf(true) }
+    var autoRadioEnabled by remember { mutableStateOf(true) }
+
+    // Dialog for Player & Audio
+    if (selectedCategory == "Player") {
+        AlertDialog(
+            onDismissRequest = { selectedCategory = null },
+            title = { Text("Player & Audio", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("High Quality Audio", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Stream & cache at 320 kbps Opus/AAC", color = TextSecondary, fontSize = 12.sp)
+                        }
+                        Switch(
+                            checked = audioQualityHigh,
+                            onCheckedChange = { audioQualityHigh = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MuziBlue)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Endless Auto-Radio", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Auto-enrich queue when songs are ending", color = TextSecondary, fontSize = 12.sp)
+                        }
+                        Switch(
+                            checked = autoRadioEnabled,
+                            onCheckedChange = { autoRadioEnabled = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MuziBlue)
+                        )
+                    }
+
+                    Text("Audio Output: Lavaplayer Native 44.1 kHz PCM", color = MuziBlue, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedCategory = null }) {
+                    Text("Done", color = MuziBlue)
+                }
+            },
+            containerColor = Color(0xFF1E1E22)
+        )
+    }
+
+    // Dialog for Appearance
+    if (selectedCategory == "Appearance") {
+        AlertDialog(
+            onDismissRequest = { selectedCategory = null },
+            title = { Text("Appearance", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("Theme Style: AMOLED Pure Black", color = TextSecondary, fontSize = 14.sp)
+                    Text("Ambient Mesh Glow: Dynamic Reactive Palette", color = TextSecondary, fontSize = 14.sp)
+                    Text("Layout: Android Muzi Material 3 Design System", color = MuziBlue, fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedCategory = null }) {
+                    Text("Done", color = MuziBlue)
+                }
+            },
+            containerColor = Color(0xFF1E1E22)
+        )
+    }
+
     // Dialog for Storage / Cache
     if (selectedCategory == "Storage") {
         AlertDialog(

@@ -200,6 +200,60 @@ object YouTubeMusicService {
         }
     }
 
+    data class ArtistDetails(
+        val id: String,
+        val name: String,
+        val thumbnailUrl: String?,
+        val subscriberCount: String?,
+        val monthlyListeners: String?,
+        val topSongs: List<Song>,
+        val albums: List<AlbumDetails>
+    )
+
+    suspend fun getArtist(browseId: String): ArtistDetails? = withContext(Dispatchers.IO) {
+        try {
+            val page = YouTube.artist(browseId).getOrNull() ?: return@withContext null
+            val songItems = page.sections.flatMap { it.items }.filterIsInstance<SongItem>()
+            val topSongs = songItems.map { item ->
+                Song(
+                    id = item.id,
+                    title = item.title,
+                    artist = item.artists.joinToString(", ") { it.name },
+                    album = item.album?.name ?: "Single",
+                    durationText = item.duration?.let { "%d:%02d".format(it / 60, it % 60) } ?: "3:30",
+                    durationSeconds = item.duration?.toLong() ?: 210L,
+                    thumbnailUrl = item.thumbnail ?: page.artist.thumbnail ?: "",
+                    streamUrl = null
+                )
+            }.distinctBy { it.id }
+
+            val albumItems = page.sections.flatMap { it.items }.filterIsInstance<com.music.innertube.models.AlbumItem>()
+            val albums = albumItems.map { a ->
+                AlbumDetails(
+                    id = a.id,
+                    title = a.title,
+                    artist = a.artists?.joinToString(", ") { it.name } ?: page.artist.title,
+                    year = a.year?.toString(),
+                    thumbnailUrl = a.thumbnail ?: "",
+                    songs = emptyList()
+                )
+            }
+
+            ArtistDetails(
+                id = page.artist.id,
+                name = page.artist.title,
+                thumbnailUrl = page.artist.thumbnail,
+                subscriberCount = page.subscriberCountText,
+                monthlyListeners = page.monthlyListenerCount,
+                topSongs = topSongs,
+                albums = albums
+            )
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] Error fetching artist $browseId: ${e.message}")
+            null
+        }
+    }
+
     // Guaranteed Full Length YouTube Stream Playback for Windows PC
     suspend fun resolveStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
         // 1. Try ANDROID_NO_SDK (Most reliable for direct unthrottled streams on PC)

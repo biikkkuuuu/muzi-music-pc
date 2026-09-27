@@ -20,6 +20,7 @@ import com.muzi.desktop.ui.screens.HomeScreen
 import com.muzi.desktop.ui.screens.LibraryScreen
 import com.muzi.desktop.ui.screens.PlayerScreen
 import com.muzi.desktop.ui.screens.SearchScreen
+import com.muzi.desktop.ui.screens.ArtistScreen
 import com.muzi.desktop.ui.screens.PlaylistDetailScreen
 import com.muzi.desktop.ui.screens.SettingsScreen
 import com.muzi.desktop.ui.theme.MuziTheme
@@ -35,6 +36,10 @@ fun main() = application {
     var currentAlbumId by remember { mutableStateOf<String?>(null) }
     var currentDetailTitle by remember { mutableStateOf("Playlist") }
     var currentDetailThumbnail by remember { mutableStateOf<String?>(null) }
+
+    var currentArtistId by remember { mutableStateOf<String?>(null) }
+    var currentArtistName by remember { mutableStateOf("Artist") }
+    var currentArtistThumbnail by remember { mutableStateOf<String?>(null) }
 
     Window(
         onCloseRequest = ::exitApplication,
@@ -165,6 +170,13 @@ fun main() = application {
                                         currentDetailThumbnail = thumb
                                         currentTab = ScreenTab.PLAYLIST_DETAIL
                                     },
+                                    onArtistClick = { id, name, thumb ->
+                                        previousTab = ScreenTab.HOME
+                                        currentArtistId = id
+                                        currentArtistName = name
+                                        currentArtistThumbnail = thumb
+                                        currentTab = ScreenTab.ARTIST_DETAIL
+                                    },
                                     onSettingsClick = {
                                         previousTab = currentTab
                                         currentTab = ScreenTab.SETTINGS
@@ -201,6 +213,25 @@ fun main() = application {
                                     onSongClick = { _ ->
                                         previousTab = ScreenTab.PLAYLIST_DETAIL
                                         currentTab = ScreenTab.PLAYER
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                ScreenTab.ARTIST_DETAIL -> ArtistScreen(
+                                    artistId = currentArtistId ?: "",
+                                    fallbackName = currentArtistName,
+                                    fallbackThumbnail = currentArtistThumbnail,
+                                    onBackClick = { currentTab = previousTab },
+                                    onSongClick = { _ ->
+                                        previousTab = ScreenTab.ARTIST_DETAIL
+                                        currentTab = ScreenTab.PLAYER
+                                    },
+                                    onAlbumClick = { id, title, thumb ->
+                                        previousTab = ScreenTab.ARTIST_DETAIL
+                                        currentAlbumId = id
+                                        currentPlaylistId = null
+                                        currentDetailTitle = title
+                                        currentDetailThumbnail = thumb
+                                        currentTab = ScreenTab.PLAYLIST_DETAIL
                                     },
                                     modifier = Modifier.fillMaxSize()
                                 )

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.innertube.models.AlbumItem
+import com.music.innertube.models.ArtistItem
 import com.music.innertube.models.PlaylistItem
 import com.music.innertube.models.SongItem
 import com.music.innertube.pages.HomePage
@@ -43,6 +44,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onSongClick: (Song) -> Unit,
     onPlaylistClick: (id: String, isAlbum: Boolean, title: String, thumbnail: String?) -> Unit = { _, _, _, _ -> },
+    onArtistClick: (id: String, name: String, thumbnail: String?) -> Unit = { _, _, _ -> },
     onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -495,7 +497,11 @@ fun HomeScreen(
             item {
                 Column {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onArtistClick(similarSeed!!.artist, similarSeed!!.artist, similarSeed!!.thumbnailUrl)
+                            },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -817,6 +823,7 @@ fun HomeScreen(
                                     val (title, subtitle, thumb) = when (item) {
                                         is PlaylistItem -> Triple(item.title, item.author?.name ?: "Playlist", item.thumbnail ?: "")
                                         is AlbumItem -> Triple(item.title, item.artists?.joinToString(", ") { it.name } ?: "Album", item.thumbnail ?: "")
+                                        is ArtistItem -> Triple(item.title, "Artist", item.thumbnail ?: "")
                                         else -> Triple("Music", "Collection", "")
                                     }
                                     Column(
@@ -827,6 +834,7 @@ fun HomeScreen(
                                                 when (item) {
                                                     is PlaylistItem -> onPlaylistClick(item.id, false, title, thumb)
                                                     is AlbumItem -> onPlaylistClick(item.id, true, title, thumb)
+                                                    is ArtistItem -> onArtistClick(item.id, title, thumb)
                                                     else -> {
                                                         coroutineScope.launch {
                                                             val searchResults = YouTubeMusicService.search(title)

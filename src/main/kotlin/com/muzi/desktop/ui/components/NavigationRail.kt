@@ -21,7 +21,7 @@ import com.muzi.desktop.ui.theme.MuziAccent
 import com.muzi.desktop.ui.theme.PureBlack
 
 enum class ScreenTab {
-    HOME, SEARCH, LIBRARY, SETTINGS, PLAYER, PLAYLIST_DETAIL
+    HOME, SEARCH, LIBRARY, SETTINGS, PLAYER, PLAYLIST_DETAIL, ARTIST_DETAIL
 }
 
 @Composable
