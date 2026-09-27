@@ -128,12 +128,13 @@ object LibraryManager {
         save()
     }
 
-    fun createPlaylist(name: String) {
-        if (name.isBlank()) return
+    fun createPlaylist(name: String): UserPlaylist {
+        val newPl = UserPlaylist(title = name.trim())
         val current = _playlists.value.toMutableList()
-        current.add(0, UserPlaylist(title = name))
+        current.add(0, newPl)
         _playlists.value = current
         save()
+        return newPl
     }
 
     fun deletePlaylist(id: String) {
