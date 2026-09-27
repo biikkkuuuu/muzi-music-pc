@@ -216,14 +216,26 @@ fun PlayerScreen(
 
                 // Progress Bar + Time Stamps
                 Column(modifier = Modifier.width(360.dp)) {
+                    var isDragging by remember { mutableStateOf(false) }
+                    var dragProgress by remember { mutableStateOf(0f) }
+
                     val progress = if (durationMillis > 0) {
                         (positionMillis.toFloat() / durationMillis.toFloat()).coerceIn(0f, 1f)
                     } else 0f
 
+                    val displayProgress = if (isDragging) dragProgress else progress
+                    val displayMillis = if (isDragging) (dragProgress * durationMillis).toLong() else positionMillis
+
                     Slider(
-                        value = progress,
+                        value = displayProgress,
                         onValueChange = { newProgress ->
-                            DesktopAudioPlayer.seekTo((newProgress * durationMillis).toLong())
+                            isDragging = true
+                            dragProgress = newProgress
+                        },
+                        onValueChangeFinished = {
+                            val targetMs = (dragProgress * durationMillis).toLong()
+                            DesktopAudioPlayer.seekTo(targetMs)
+                            isDragging = false
                         },
                         colors = SliderDefaults.colors(
                             thumbColor = Color.White,
@@ -238,7 +250,7 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = formatTime(positionMillis),
+                            text = formatTime(displayMillis),
                             color = TextSecondary,
                             fontSize = 12.sp
                         )

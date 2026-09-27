@@ -1,9 +1,11 @@
-﻿package com.muzi.desktop.ui.components
+package com.muzi.desktop.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -64,12 +66,20 @@ fun MiniPlayerBar(
                 .border(1.dp, SurfaceBorder, RoundedCornerShape(18.dp))
                 .clickable(onClick = onClick)
         ) {
-            // Live Progress Bar on top edge (Signature Muzi Red #ED5564)
+            // Live Progress Bar on top edge (Signature Muzi Red #ED5564) - Interactive Click to Seek
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(3.dp)
+                    .height(5.dp)
                     .background(Color(0xFF222222))
+                    .pointerInput(durationMillis) {
+                        detectTapGestures { offset ->
+                            if (durationMillis > 0 && size.width > 0) {
+                                val ratio = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                DesktopAudioPlayer.seekTo((ratio * durationMillis).toLong())
+                            }
+                        }
+                    }
             ) {
                 Box(
                     modifier = Modifier

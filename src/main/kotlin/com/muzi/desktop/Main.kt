@@ -130,22 +130,19 @@ fun main() = application {
                         ) { tab ->
                             when (tab) {
                                 ScreenTab.HOME -> HomeScreen(
-                                    onSongClick = { song ->
-                                        DesktopAudioPlayer.playSong(song)
+                                    onSongClick = { _ ->
                                         previousTab = ScreenTab.HOME
                                         currentTab = ScreenTab.PLAYER
                                     }
                                 )
                                 ScreenTab.SEARCH -> SearchScreen(
-                                    onSongClick = { song ->
-                                        DesktopAudioPlayer.playSong(song)
+                                    onSongClick = { _ ->
                                         previousTab = ScreenTab.SEARCH
                                         currentTab = ScreenTab.PLAYER
                                     }
                                 )
                                 ScreenTab.LIBRARY -> LibraryScreen(
-                                    onSongClick = { song ->
-                                        DesktopAudioPlayer.playSong(song)
+                                    onSongClick = { _ ->
                                         previousTab = ScreenTab.LIBRARY
                                         currentTab = ScreenTab.PLAYER
                                     }

@@ -5,8 +5,6 @@ import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.innertube.YouTubeMusicService
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.DynamicColorExtractor
-import com.sedmelluq.discord.lavaplayer.format.AudioDataFormatTools
-import com.sedmelluq.discord.lavaplayer.format.AudioPlayerInputStream
 import com.sedmelluq.discord.lavaplayer.format.StandardAudioDataFormats
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer
@@ -18,10 +16,12 @@ import com.sedmelluq.discord.lavaplayer.tools.FriendlyException
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason
+import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.io.InputStream
+import java.nio.ByteBuffer
+import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
 import javax.sound.sampled.SourceDataLine
@@ -69,7 +69,7 @@ object DesktopAudioPlayer {
     private val _dynamicThemeColor = MutableStateFlow(Color(0xFFE50914))
     val dynamicThemeColor = _dynamicThemeColor.asStateFlow()
 
-    // PC Native Audio via Lavaplayer & Windows Sound Architecture
+    // PC Native Audio via Lavaplayer (Exact 44.1kHz Natural Speed & Zero-Lag Seek)
     private val outputFormat = StandardAudioDataFormats.COMMON_PCM_S16_BE
     private val playerManager: DefaultAudioPlayerManager = DefaultAudioPlayerManager().apply {
         configuration.outputFormat = outputFormat
@@ -79,7 +79,6 @@ object DesktopAudioPlayer {
 
     private val audioPlayer: AudioPlayer = playerManager.createPlayer()
     private var audioLine: SourceDataLine? = null
-    private var audioStream: InputStream? = null
 
     init {
         audioPlayer.volume = (_volume.value * 100).toInt().coerceIn(0, 100)
@@ -105,30 +104,31 @@ object DesktopAudioPlayer {
     }
 
     private fun startHardwareAudioThread() {
-        val javaFormat = AudioDataFormatTools.toAudioFormat(outputFormat)
+        val format = AudioFormat(44100f, 16, 2, true, true)
         try {
-            val lineInfo = DataLine.Info(SourceDataLine::class.java, javaFormat)
+            val lineInfo = DataLine.Info(SourceDataLine::class.java, format)
             val line = AudioSystem.getLine(lineInfo) as SourceDataLine
-            line.open(javaFormat, 1024 * 32)
+            line.open(format, 1024 * 16)
             line.start()
             audioLine = line
-            println("[DesktopAudioPlayer] Windows PC audio line opened: $javaFormat")
+            println("[DesktopAudioPlayer] Windows PC audio line opened: 44.1kHz Stereo")
         } catch (e: Exception) {
             println("[DesktopAudioPlayer] Error opening audio line: ${e.message}")
         }
 
-        audioStream = AudioPlayerInputStream.createStream(audioPlayer, outputFormat, 10000L, false)
-
         scope.launch(Dispatchers.IO) {
-            val buffer = ByteArray(1024 * 4)
+            val frameBuffer = ByteBuffer.allocate(outputFormat.maximumChunkSize())
+            val frame = MutableAudioFrame()
+            frame.setBuffer(frameBuffer)
+
             while (isActive) {
                 if (_isPlaying.value && !audioPlayer.isPaused) {
-                    val stream = audioStream
-                    val count = stream?.read(buffer, 0, buffer.size) ?: -1
-                    if (count > 0) {
-                        audioLine?.write(buffer, 0, count)
+                    if (audioPlayer.provide(frame)) {
+                        val bytes = frameBuffer.array()
+                        val len = frame.dataLength
+                        audioLine?.write(bytes, 0, len)
                     } else {
-                        delay(4)
+                        delay(2)
                     }
                 } else {
                     delay(20)
@@ -147,10 +147,12 @@ object DesktopAudioPlayer {
                         _durationMillis.value = track.duration
                     }
                 }
-                delay(200)
+                delay(150)
             }
         }
     }
+
+    private var currentPlayJob: Job? = null
 
     fun playSong(song: Song, newQueue: List<Song>? = null) {
         _currentSong.value = song
@@ -166,9 +168,11 @@ object DesktopAudioPlayer {
             _dynamicThemeColor.value = color
         }
 
+        // Manage Queue
         if (newQueue != null && newQueue.isNotEmpty()) {
             _queue.value = newQueue
-            _queueIndex.value = newQueue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            val foundIdx = newQueue.indexOfFirst { it.id == song.id }
+            _queueIndex.value = if (foundIdx >= 0) foundIdx else 0
         } else {
             val existing = _queue.value
             val existingIdx = existing.indexOfFirst { it.id == song.id }
@@ -177,21 +181,38 @@ object DesktopAudioPlayer {
             } else {
                 _queue.value = listOf(song)
                 _queueIndex.value = 0
-                scope.launch {
-                    val radioSongs = YouTubeMusicService.fetchRadioQueue(song.id)
-                    if (radioSongs.isNotEmpty()) {
-                        val merged = listOf(song) + radioSongs.filter { it.id != song.id }
-                        _queue.value = merged
+            }
+        }
+
+        // Automatically fetch and append radio queue in the background if queue has few remaining songs
+        scope.launch {
+            val q = _queue.value
+            val currentIdx = _queueIndex.value
+            if (q.size - currentIdx <= 3) {
+                val radio = YouTubeMusicService.fetchRadioQueue(song.id)
+                if (radio.isNotEmpty()) {
+                    val currentQ = _queue.value
+                    val freshSongs = radio.filter { r -> currentQ.none { it.id == r.id } }
+                    if (freshSongs.isNotEmpty()) {
+                        _queue.value = currentQ + freshSongs
+                        println("[DesktopAudioPlayer] Radio queue enriched with ${freshSongs.size} songs. Total queue: ${_queue.value.size}")
                     }
                 }
             }
         }
 
-        scope.launch {
+        // Cancel previous loading or playback download job immediately
+        currentPlayJob?.cancel()
+        audioPlayer.stopTrack()
+        audioLine?.flush()
+
+        currentPlayJob = scope.launch {
             try {
                 val audioFile = AudioCacheManager.getAudioFile(song.id) {
                     song.streamUrl ?: YouTubeMusicService.resolveStreamUrl(song.id)
                 }
+
+                if (!isActive) return@launch
 
                 val source = if (audioFile != null && audioFile.exists() && audioFile.length() > 50000) {
                     audioFile.absolutePath
@@ -207,6 +228,8 @@ object DesktopAudioPlayer {
                     _isBuffering.value = false
                     _isPlaying.value = false
                 }
+            } catch (e: CancellationException) {
+                println("[DesktopAudioPlayer] Playback task cancelled for: ${song.title}")
             } catch (e: Exception) {
                 println("[DesktopAudioPlayer] Error in playSong: ${e.message}")
                 e.printStackTrace()
@@ -218,6 +241,7 @@ object DesktopAudioPlayer {
 
     private fun loadAndPlay(source: String) {
         audioPlayer.stopTrack()
+        audioLine?.flush()
         playerManager.loadItem(source, object : AudioLoadResultHandler {
             override fun trackLoaded(track: AudioTrack) {
                 println("[DesktopAudioPlayer] Track loaded: ${track.info.title} duration=${track.duration}ms")
@@ -277,11 +301,26 @@ object DesktopAudioPlayer {
         }
 
         if (nextIndex in q.indices) {
-            playSongAt(nextIndex)
+            _queueIndex.value = nextIndex
+            playSong(q[nextIndex], q)
         } else if (_repeatMode.value == RepeatMode.ALL && q.isNotEmpty()) {
-            playSongAt(0)
+            _queueIndex.value = 0
+            playSong(q[0], q)
         } else {
-            _isPlaying.value = false
+            // Queue ended! Fetch radio queue to continue seamless playback
+            scope.launch {
+                val current = _currentSong.value ?: return@launch
+                val radio = YouTubeMusicService.fetchRadioQueue(current.id)
+                if (radio.isNotEmpty()) {
+                    val extended = q + radio.filter { r -> q.none { it.id == r.id } }
+                    _queue.value = extended
+                    val next = q.size
+                    if (next in extended.indices) {
+                        _queueIndex.value = next
+                        playSong(extended[next], extended)
+                    }
+                }
+            }
         }
     }
 
@@ -292,8 +331,10 @@ object DesktopAudioPlayer {
         }
 
         val prevIndex = _queueIndex.value - 1
-        if (prevIndex >= 0) {
-            playSongAt(prevIndex)
+        val q = _queue.value
+        if (prevIndex in q.indices) {
+            _queueIndex.value = prevIndex
+            playSong(q[prevIndex], q)
         } else {
             seekTo(0)
         }
@@ -333,6 +374,7 @@ object DesktopAudioPlayer {
         val target = positionMillis.coerceIn(0L, _durationMillis.value)
         _currentPositionMillis.value = target
         audioPlayer.playingTrack?.position = target
+        audioLine?.flush()
     }
 
     fun seekRelative(deltaMillis: Long) {
