@@ -45,6 +45,8 @@ fun HomeScreen(
     onSongClick: (Song) -> Unit,
     onPlaylistClick: (id: String, isAlbum: Boolean, title: String, thumbnail: String?) -> Unit = { _, _, _, _ -> },
     onArtistClick: (id: String, name: String, thumbnail: String?) -> Unit = { _, _, _ -> },
+    onHistoryClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -165,10 +167,10 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    IconButton(onClick = {}) {
+                    IconButton(onClick = onHistoryClick) {
                         Icon(Icons.Default.History, "History", tint = TextPrimary, modifier = Modifier.size(22.dp))
                     }
-                    IconButton(onClick = {}) {
+                    IconButton(onClick = onStatsClick) {
                         Icon(Icons.Default.TrendingUp, "Stats", tint = TextPrimary, modifier = Modifier.size(22.dp))
                     }
                     IconButton(onClick = {}) {

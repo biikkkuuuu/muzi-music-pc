@@ -40,6 +40,10 @@ enum class LibraryTileFilter {
 @Composable
 fun LibraryScreen(
     onSongClick: (Song) -> Unit,
+    onPlaylistClick: (id: String, isAlbum: Boolean, title: String, thumbnail: String?) -> Unit = { _, _, _, _ -> },
+    onArtistClick: (id: String, name: String, thumbnail: String?) -> Unit = { _, _, _ -> },
+    onHistoryClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -48,6 +52,28 @@ fun LibraryScreen(
     val playlists by LibraryManager.playlists.collectAsState()
     val downloadedSongs = remember(likedSongs, historySongs) { LibraryManager.getDownloadedSongs() }
     val playCounts by LibraryManager.playCounts.collectAsState()
+
+    val allSongs = remember(likedSongs, historySongs) {
+        (likedSongs + historySongs).distinctBy { it.id }
+    }
+    val allAlbums = remember(likedSongs, historySongs) {
+        (likedSongs + historySongs)
+            .filter { it.album.isNotBlank() && it.album != "Single" }
+            .groupBy { it.album }
+            .map { (albumTitle, songs) ->
+                val first = songs.first()
+                Triple(first.id, albumTitle, first.thumbnailUrl)
+            }
+    }
+    val allArtists = remember(likedSongs, historySongs) {
+        (likedSongs + historySongs)
+            .filter { it.artist.isNotBlank() }
+            .groupBy { it.artist }
+            .map { (artistName, songs) ->
+                val first = songs.first()
+                Triple(first.artist, artistName, first.thumbnailUrl)
+            }
+    }
 
     var selectedTab by remember { mutableStateOf(LibraryTab.PLAYLISTS) }
     var tileFilter by remember { mutableStateOf(LibraryTileFilter.ALL) }
@@ -135,10 +161,10 @@ fun LibraryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        IconButton(onClick = {}) {
+                        IconButton(onClick = onHistoryClick) {
                             Icon(Icons.Default.History, "History", tint = TextPrimary, modifier = Modifier.size(22.dp))
                         }
-                        IconButton(onClick = {}) {
+                        IconButton(onClick = onStatsClick) {
                             Icon(Icons.Default.TrendingUp, "Stats", tint = TextPrimary, modifier = Modifier.size(22.dp))
                         }
                         IconButton(onClick = {}) {
@@ -356,6 +382,114 @@ fun LibraryScreen(
                         },
                         onOptionsClick = { selectedSongForOptions = song }
                     )
+                }
+            } else if (selectedTab == LibraryTab.SONGS) {
+                item {
+                    Text(
+                        text = "All Songs (${allSongs.size})",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                items(allSongs) { song ->
+                    LibrarySongRow(
+                        song = song,
+                        onClick = {
+                            DesktopAudioPlayer.playSong(song, allSongs)
+                            onSongClick(song)
+                        },
+                        onOptionsClick = { selectedSongForOptions = song }
+                    )
+                }
+            } else if (selectedTab == LibraryTab.ALBUMS) {
+                item {
+                    Text(
+                        text = "Albums (${allAlbums.size})",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        allAlbums.chunked(5).forEach { rowAlbums ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                rowAlbums.forEach { (id, title, thumb) ->
+                                    Column(
+                                        modifier = Modifier
+                                            .width(140.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { onPlaylistClick(id, true, title, thumb) }
+                                    ) {
+                                        AsyncImage(
+                                            model = thumb,
+                                            contentDescription = title,
+                                            modifier = Modifier.size(140.dp).clip(RoundedCornerShape(12.dp)),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = title,
+                                            color = TextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (selectedTab == LibraryTab.ARTISTS) {
+                item {
+                    Text(
+                        text = "Artists (${allArtists.size})",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        allArtists.chunked(5).forEach { rowArtists ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                rowArtists.forEach { (id, name, thumb) ->
+                                    Column(
+                                        modifier = Modifier
+                                            .width(130.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { onArtistClick(id, name, thumb) },
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        AsyncImage(
+                                            model = thumb,
+                                            contentDescription = name,
+                                            modifier = Modifier.size(110.dp).clip(CircleShape).background(SurfaceDark),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = name,
+                                            color = TextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 // Default: Playlists Header & List (Image 1 Parity)

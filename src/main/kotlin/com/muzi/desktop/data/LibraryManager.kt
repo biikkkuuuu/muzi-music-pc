@@ -121,6 +121,12 @@ object LibraryManager {
         save()
     }
 
+    fun clearHistory() {
+        _historySongs.value = emptyList()
+        _playCounts.value = emptyMap()
+        save()
+    }
+
     fun getSpeedDialSongs(limit: Int = 6): List<Song> {
         val history = _historySongs.value
         val counts = _playCounts.value

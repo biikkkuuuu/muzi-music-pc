@@ -21,8 +21,10 @@ import com.muzi.desktop.ui.screens.LibraryScreen
 import com.muzi.desktop.ui.screens.PlayerScreen
 import com.muzi.desktop.ui.screens.SearchScreen
 import com.muzi.desktop.ui.screens.ArtistScreen
+import com.muzi.desktop.ui.screens.HistoryScreen
 import com.muzi.desktop.ui.screens.PlaylistDetailScreen
 import com.muzi.desktop.ui.screens.SettingsScreen
+import com.muzi.desktop.ui.screens.StatsScreen
 import com.muzi.desktop.ui.theme.MuziTheme
 import com.muzi.desktop.ui.theme.PureBlack
 
@@ -177,6 +179,14 @@ fun main() = application {
                                         currentArtistThumbnail = thumb
                                         currentTab = ScreenTab.ARTIST_DETAIL
                                     },
+                                    onHistoryClick = {
+                                        previousTab = currentTab
+                                        currentTab = ScreenTab.HISTORY
+                                    },
+                                    onStatsClick = {
+                                        previousTab = currentTab
+                                        currentTab = ScreenTab.STATS
+                                    },
                                     onSettingsClick = {
                                         previousTab = currentTab
                                         currentTab = ScreenTab.SETTINGS
@@ -192,6 +202,34 @@ fun main() = application {
                                     onSongClick = { _ ->
                                         previousTab = ScreenTab.LIBRARY
                                         currentTab = ScreenTab.PLAYER
+                                    },
+                                    onPlaylistClick = { id, isAlbum, title, thumb ->
+                                        previousTab = ScreenTab.LIBRARY
+                                        if (isAlbum) {
+                                            currentAlbumId = id
+                                            currentPlaylistId = null
+                                        } else {
+                                            currentPlaylistId = id
+                                            currentAlbumId = null
+                                        }
+                                        currentDetailTitle = title
+                                        currentDetailThumbnail = thumb
+                                        currentTab = ScreenTab.PLAYLIST_DETAIL
+                                    },
+                                    onArtistClick = { id, name, thumb ->
+                                        previousTab = ScreenTab.LIBRARY
+                                        currentArtistId = id
+                                        currentArtistName = name
+                                        currentArtistThumbnail = thumb
+                                        currentTab = ScreenTab.ARTIST_DETAIL
+                                    },
+                                    onHistoryClick = {
+                                        previousTab = currentTab
+                                        currentTab = ScreenTab.HISTORY
+                                    },
+                                    onStatsClick = {
+                                        previousTab = currentTab
+                                        currentTab = ScreenTab.STATS
                                     },
                                     onSettingsClick = {
                                         previousTab = currentTab
@@ -232,6 +270,29 @@ fun main() = application {
                                         currentDetailTitle = title
                                         currentDetailThumbnail = thumb
                                         currentTab = ScreenTab.PLAYLIST_DETAIL
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                ScreenTab.HISTORY -> HistoryScreen(
+                                    onBackClick = { currentTab = previousTab },
+                                    onSongClick = { _ ->
+                                        previousTab = ScreenTab.HISTORY
+                                        currentTab = ScreenTab.PLAYER
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                ScreenTab.STATS -> StatsScreen(
+                                    onBackClick = { currentTab = previousTab },
+                                    onSongClick = { _ ->
+                                        previousTab = ScreenTab.STATS
+                                        currentTab = ScreenTab.PLAYER
+                                    },
+                                    onArtistClick = { name ->
+                                        previousTab = ScreenTab.STATS
+                                        currentArtistId = ""
+                                        currentArtistName = name
+                                        currentArtistThumbnail = null
+                                        currentTab = ScreenTab.ARTIST_DETAIL
                                     },
                                     modifier = Modifier.fillMaxSize()
                                 )
