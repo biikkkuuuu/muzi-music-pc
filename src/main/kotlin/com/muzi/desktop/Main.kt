@@ -118,12 +118,17 @@ fun main() = application {
             ) {
                 // Base Content Layout (Always active beneath the player)
                 Row(modifier = Modifier.fillMaxSize()) {
-                    // Left Navigation Rail (Muzi Android style side-nav)
+                    var showQuickMenu by remember { mutableStateOf(false) }
+
+                    // Left Navigation Rail (Muzi Android style side-nav as a pill)
                     MuziNavigationRail(
                         currentTab = if (currentTab == ScreenTab.PLAYER) previousTab else currentTab,
                         onTabSelected = { 
                             previousTab = currentTab
                             currentTab = it 
+                        },
+                        onMoreClick = {
+                            showQuickMenu = true
                         }
                     )
 
@@ -133,8 +138,6 @@ fun main() = application {
                             .weight(1f)
                             .fillMaxHeight()
                     ) {
-                        var showQuickMenu by remember { mutableStateOf(false) }
-
                         if (showQuickMenu) {
                             com.muzi.desktop.ui.components.QuickMenuDialog(
                                 onDismiss = { showQuickMenu = false },
@@ -319,17 +322,6 @@ fun main() = application {
                                         }
                                     )
                                 }
-
-                                com.muzi.desktop.ui.components.FloatingBottomNavBar(
-                                    currentTab = if (currentTab == ScreenTab.PLAYER) previousTab else currentTab,
-                                    onTabSelected = {
-                                        previousTab = currentTab
-                                        currentTab = it
-                                    },
-                                    onMoreClick = {
-                                        showQuickMenu = true
-                                    }
-                                )
                             }
                         }
                     }
