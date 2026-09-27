@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,7 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,7 +50,22 @@ fun HomeScreen(
     var fallbackQuickPicks by remember { mutableStateOf<List<Song>>(emptyList()) }
     var selectedChip by remember { mutableStateOf<HomePage.Chip?>(null) }
     var isLoadingFeed by remember { mutableStateOf(true) }
+
+    // Adaptive Data from local listening history
     val historySongs by LibraryManager.historySongs.collectAsState()
+    val playCounts by LibraryManager.playCounts.collectAsState()
+
+    val speedDialSongs = remember(historySongs, playCounts) {
+        LibraryManager.getSpeedDialSongs(6)
+    }
+    val forgottenFavorites = remember(historySongs, playCounts) {
+        LibraryManager.getForgottenFavorites()
+    }
+
+    var dailyDiscoverSong by remember { mutableStateOf<Song?>(null) }
+    var dailyDiscoverSeed by remember { mutableStateOf<Song?>(null) }
+    var similarSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var similarSeed by remember { mutableStateOf<Song?>(null) }
 
     val dynamicColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
     val animatedAccent by animateColorAsState(dynamicColor, animationSpec = tween(600))
@@ -56,9 +74,10 @@ fun HomeScreen(
     var selectedSongForPlaylist by remember { mutableStateOf<Song?>(null) }
 
     val defaultMoodChips = listOf(
-        "Feel good", "Romance", "Work out", "Party", "Energise", "Relax", "Commute", "Sad", "Focus", "Sleep"
+        "Energise", "Workout", "Relax", "Commute", "Focus", "Party", "Romance", "Feel good", "Sad", "Sleep"
     )
 
+    // Initial Load (Fresh Install / Static Feed)
     LaunchedEffect(Unit) {
         charts = YouTubeMusicService.getBrowseCharts()
         val feed = YouTubeMusicService.getHomeFeed()
@@ -70,6 +89,24 @@ fun HomeScreen(
         isLoadingFeed = false
     }
 
+    // Adaptive Listening Listener
+    LaunchedEffect(historySongs) {
+        if (historySongs.isNotEmpty()) {
+            val seed = LibraryManager.getDailyDiscoverSeed()
+            if (seed != null && seed.id != dailyDiscoverSeed?.id) {
+                dailyDiscoverSeed = seed
+                val recs = YouTubeMusicService.fetchRadioQueue(seed.id)
+                dailyDiscoverSong = recs.firstOrNull { it.id != seed.id }
+            }
+            val recent = historySongs.firstOrNull()
+            if (recent != null && recent.id != similarSeed?.id) {
+                similarSeed = recent
+                similarSongs = YouTubeMusicService.fetchRadioQueue(recent.id).filter { it.id != recent.id }
+            }
+        }
+    }
+
+    // Chip Filter Change
     LaunchedEffect(selectedChip) {
         if (selectedChip != null) {
             isLoadingFeed = true
@@ -83,6 +120,7 @@ fun HomeScreen(
         }
     }
 
+    // Dialogs
     selectedSongForOptions?.let { song ->
         SongOptionsDialog(
             song = song,
@@ -105,7 +143,7 @@ fun HomeScreen(
             .padding(horizontal = 36.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-        // App Header & Mood Chips
+        // App Header & Mood Chips Row (Always visible)
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -170,7 +208,205 @@ fun HomeScreen(
             }
         }
 
-        // Keep Listening / Recently Played
+        // ==========================================
+        // ADAPTIVE SECTION 1: Speed Dial Grid
+        // (Appears adaptively once user listens to songs)
+        // ==========================================
+        if (selectedChip == null && speedDialSongs.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Speed dial",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    val chunked = speedDialSongs.chunked(3)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        chunked.forEach { rowSongs ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                rowSongs.forEach { song ->
+                                    Row(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFF1A1A1A))
+                                            .clickable {
+                                                DesktopAudioPlayer.playSong(song, speedDialSongs)
+                                                onSongClick(song)
+                                            }
+                                            .padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AsyncImage(
+                                            model = song.thumbnailUrl,
+                                            contentDescription = song.title,
+                                            modifier = Modifier
+                                                .size(52.dp)
+                                                .clip(RoundedCornerShape(8.dp)),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = song.title,
+                                                color = TextPrimary,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = song.artist,
+                                                color = TextSecondary,
+                                                fontSize = 11.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { selectedSongForOptions = song },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.MoreVert,
+                                                contentDescription = "Options",
+                                                tint = TextSecondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                repeat(3 - rowSongs.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // ADAPTIVE SECTION 2: Daily Discover (Hero Card)
+        // (Appears adaptively based on user's seed track)
+        // ==========================================
+        if (selectedChip == null && dailyDiscoverSong != null && dailyDiscoverSeed != null) {
+            item {
+                val seed = dailyDiscoverSeed!!
+                val rec = dailyDiscoverSong!!
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(170.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF181818))
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AsyncImage(
+                            model = rec.thumbnailUrl,
+                            contentDescription = rec.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.94f),
+                                            Color.Black.copy(alpha = 0.82f),
+                                            Color.Black.copy(alpha = 0.35f)
+                                        )
+                                    )
+                                )
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "BECAUSE YOU LISTENED TO ${seed.title.uppercase()}",
+                                    color = animatedAccent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = rec.title,
+                                    color = TextPrimary,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${rec.artist} • ${rec.durationText}",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { selectedSongForOptions = rec },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "Options",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                IconButton(
+                                    onClick = {
+                                        DesktopAudioPlayer.playSong(rec, listOf(rec))
+                                        onSongClick(rec)
+                                    },
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .background(animatedAccent, CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // ADAPTIVE SECTION 3: Keep Listening / Recently Played
+        // (Appears adaptively as history accumulates)
+        // ==========================================
         if (historySongs.isNotEmpty() && selectedChip == null) {
             item {
                 Column {
@@ -196,7 +432,8 @@ fun HomeScreen(
                                     AsyncImage(
                                         model = song.thumbnailUrl,
                                         contentDescription = song.title,
-                                        modifier = Modifier.size(136.dp).clip(RoundedCornerShape(12.dp))
+                                        modifier = Modifier.size(136.dp).clip(RoundedCornerShape(12.dp)),
+                                        contentScale = ContentScale.Crop
                                     )
                                     IconButton(
                                         onClick = { selectedSongForOptions = song },
@@ -228,7 +465,133 @@ fun HomeScreen(
             }
         }
 
+        // ==========================================
+        // ADAPTIVE SECTION 4: Similar to [Seed Track]
+        // ==========================================
+        if (selectedChip == null && similarSongs.isNotEmpty() && similarSeed != null) {
+            item {
+                Column {
+                    Text(
+                        text = "Similar to ${similarSeed!!.title}",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        items(similarSongs.take(10)) { song ->
+                            Column(
+                                modifier = Modifier
+                                    .width(136.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        DesktopAudioPlayer.playSong(song, similarSongs)
+                                        onSongClick(song)
+                                    }
+                            ) {
+                                Box {
+                                    AsyncImage(
+                                        model = song.thumbnailUrl,
+                                        contentDescription = song.title,
+                                        modifier = Modifier.size(136.dp).clip(RoundedCornerShape(12.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    IconButton(
+                                        onClick = { selectedSongForOptions = song },
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.MoreVert, "Options", tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = song.title,
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = song.artist,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // ADAPTIVE SECTION 5: Forgotten Favorites
+        // ==========================================
+        if (selectedChip == null && forgottenFavorites.isNotEmpty()) {
+            item {
+                Column {
+                    Text(
+                        text = "Forgotten favorites",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        items(forgottenFavorites.take(8)) { song ->
+                            Column(
+                                modifier = Modifier
+                                    .width(136.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        DesktopAudioPlayer.playSong(song, forgottenFavorites)
+                                        onSongClick(song)
+                                    }
+                            ) {
+                                Box {
+                                    AsyncImage(
+                                        model = song.thumbnailUrl,
+                                        contentDescription = song.title,
+                                        modifier = Modifier.size(136.dp).clip(RoundedCornerShape(12.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    IconButton(
+                                        onClick = { selectedSongForOptions = song },
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.MoreVert, "Options", tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = song.title,
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = song.artist,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
         // Browse Charts Section
+        // ==========================================
         if (selectedChip == null && charts.isNotEmpty()) {
             item {
                 Column {
@@ -257,7 +620,8 @@ fun HomeScreen(
                                 AsyncImage(
                                     model = chart.thumbnailUrl,
                                     contentDescription = chart.title,
-                                    modifier = Modifier.size(150.dp).clip(RoundedCornerShape(12.dp))
+                                    modifier = Modifier.size(150.dp).clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Crop
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
@@ -281,7 +645,9 @@ fun HomeScreen(
             }
         }
 
-        // Loading or Content
+        // ==========================================
+        // InnerTube Dynamic Sections & Quick Picks
+        // ==========================================
         if (isLoadingFeed) {
             item {
                 Box(
@@ -358,7 +724,8 @@ fun HomeScreen(
                                                 AsyncImage(
                                                     model = song.thumbnailUrl,
                                                     contentDescription = song.title,
-                                                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(8.dp))
+                                                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(8.dp)),
+                                                    contentScale = ContentScale.Crop
                                                 )
                                                 Spacer(modifier = Modifier.width(10.dp))
                                                 Column(modifier = Modifier.weight(1f)) {
@@ -428,7 +795,8 @@ fun HomeScreen(
                                         AsyncImage(
                                             model = thumb,
                                             contentDescription = title,
-                                            modifier = Modifier.size(150.dp).clip(RoundedCornerShape(12.dp))
+                                            modifier = Modifier.size(150.dp).clip(RoundedCornerShape(12.dp)),
+                                            contentScale = ContentScale.Crop
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
@@ -504,7 +872,8 @@ fun HomeScreen(
                                         AsyncImage(
                                             model = song.thumbnailUrl,
                                             contentDescription = song.title,
-                                            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(8.dp))
+                                            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(8.dp)),
+                                            contentScale = ContentScale.Crop
                                         )
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Column(modifier = Modifier.weight(1f)) {

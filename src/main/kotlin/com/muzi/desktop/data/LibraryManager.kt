@@ -25,7 +25,8 @@ data class LibraryData(
     val likedSongs: List<Song> = emptyList(),
     val historySongs: List<Song> = emptyList(),
     val searchHistory: List<String> = emptyList(),
-    val playlists: List<UserPlaylist> = emptyList()
+    val playlists: List<UserPlaylist> = emptyList(),
+    val playCounts: Map<String, Int> = emptyMap()
 )
 
 object LibraryManager {
@@ -39,6 +40,9 @@ object LibraryManager {
 
     private val _historySongs = MutableStateFlow<List<Song>>(emptyList())
     val historySongs = _historySongs.asStateFlow()
+
+    private val _playCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val playCounts = _playCounts.asStateFlow()
 
     private val _searchHistory = MutableStateFlow<List<String>>(emptyList())
     val searchHistory = _searchHistory.asStateFlow()
@@ -59,6 +63,7 @@ object LibraryManager {
                 _historySongs.value = data.historySongs
                 _searchHistory.value = data.searchHistory
                 _playlists.value = data.playlists
+                _playCounts.value = data.playCounts
             }
         } catch (e: Exception) {
             println("[LibraryManager] Error loading library: ${e.message}")
@@ -73,7 +78,8 @@ object LibraryManager {
                     likedSongs = _likedSongs.value,
                     historySongs = _historySongs.value,
                     searchHistory = _searchHistory.value,
-                    playlists = _playlists.value
+                    playlists = _playlists.value,
+                    playCounts = _playCounts.value
                 )
                 storageFile.writeText(json.encodeToString(data))
             } catch (e: Exception) {
@@ -107,7 +113,41 @@ object LibraryManager {
         } else {
             _historySongs.value = current
         }
+
+        val counts = _playCounts.value.toMutableMap()
+        counts[song.id] = (counts[song.id] ?: 0) + 1
+        _playCounts.value = counts
+
         save()
+    }
+
+    fun getSpeedDialSongs(limit: Int = 6): List<Song> {
+        val history = _historySongs.value
+        val counts = _playCounts.value
+        if (history.isEmpty()) return emptyList()
+
+        return history.sortedByDescending { counts[it.id] ?: 1 }.take(limit)
+    }
+
+    fun getDailyDiscoverSeed(): Song? {
+        val topSongs = getSpeedDialSongs(5)
+        if (topSongs.isNotEmpty()) {
+            return topSongs.random()
+        }
+        val liked = _likedSongs.value
+        if (liked.isNotEmpty()) {
+            return liked.random()
+        }
+        return _historySongs.value.firstOrNull()
+    }
+
+    fun getForgottenFavorites(): List<Song> {
+        val history = _historySongs.value
+        val counts = _playCounts.value
+        if (history.size <= 5) return emptyList()
+
+        val olderSongs = history.drop(5)
+        return olderSongs.filter { (counts[it.id] ?: 0) >= 2 }
     }
 
     fun addSearchQuery(query: String) {
