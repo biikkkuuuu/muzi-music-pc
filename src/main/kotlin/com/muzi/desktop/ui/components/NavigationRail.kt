@@ -1,4 +1,4 @@
-﻿package com.muzi.desktop.ui.components
+package com.muzi.desktop.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,7 +21,7 @@ import com.muzi.desktop.ui.theme.MuziAccent
 import com.muzi.desktop.ui.theme.PureBlack
 
 enum class ScreenTab {
-    HOME, SEARCH, LIBRARY, SETTINGS, PLAYER
+    HOME, SEARCH, LIBRARY, SETTINGS, PLAYER, PLAYLIST_DETAIL
 }
 
 @Composable

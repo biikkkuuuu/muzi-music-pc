@@ -34,6 +34,9 @@ import com.muzi.desktop.audio.RepeatMode
 import com.muzi.desktop.data.LibraryManager
 import com.muzi.desktop.lyrics.LyricsProvider
 import com.muzi.desktop.model.LyricsLine
+import com.muzi.desktop.ui.components.AddToPlaylistDialog
+import com.muzi.desktop.ui.components.AmbientGlowBackground
+import com.muzi.desktop.ui.components.SongOptionsDialog
 import com.muzi.desktop.ui.theme.*
 
 enum class PlayerSideTab {
@@ -56,15 +59,36 @@ fun PlayerScreen(
     val isShuffle by DesktopAudioPlayer.isShuffle.collectAsState()
     val repeatMode by DesktopAudioPlayer.repeatMode.collectAsState()
     val dynamicThemeColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
+    val ambientPalette by DesktopAudioPlayer.ambientPalette.collectAsState()
 
     val animatedAccent by animateColorAsState(dynamicThemeColor, animationSpec = tween(900))
-
     val isLiked = currentSong?.let { LibraryManager.isLiked(it.id) } ?: false
 
     var sideTab by remember { mutableStateOf(PlayerSideTab.LYRICS) }
     var lyrics by remember { mutableStateOf<List<LyricsLine>>(emptyList()) }
+    var showOptionsDialog by remember { mutableStateOf(false) }
+    var showAddToPlaylistDialog by remember { mutableStateOf(false) }
+
     val lyricsListState = rememberLazyListState()
     val queueListState = rememberLazyListState()
+
+    if (showOptionsDialog && currentSong != null) {
+        SongOptionsDialog(
+            song = currentSong!!,
+            onDismiss = { showOptionsDialog = false },
+            onAddToPlaylistClick = {
+                showOptionsDialog = false
+                showAddToPlaylistDialog = true
+            }
+        )
+    }
+
+    if (showAddToPlaylistDialog && currentSong != null) {
+        AddToPlaylistDialog(
+            song = currentSong!!,
+            onDismiss = { showAddToPlaylistDialog = false }
+        )
+    }
 
     LaunchedEffect(currentSong) {
         currentSong?.let { song ->
@@ -94,41 +118,79 @@ fun PlayerScreen(
         }
     }
 
-    // Dynamic Ambient Mesh Gradient Background (Signature Muzi Android Feature)
-    val ambientBrush = Brush.radialGradient(
-        colors = listOf(
-            animatedAccent.copy(alpha = 0.40f),
-            animatedAccent.copy(alpha = 0.15f),
-            Color(0xFF0A0A0A),
-            Color.Black
-        ),
-        center = Offset(200f, 300f),
-        radius = 1200f
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        // Multi-point dynamic ambient mesh glow (Signature Android Muzi Feature)
+        AmbientGlowBackground(
+            colors = ambientPalette,
+            modifier = Modifier.fillMaxSize()
+        )
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .background(ambientBrush)
-            .padding(28.dp)
-    ) {
-        // Back / Collapse Button (Top Left)
-        IconButton(
-            onClick = onBackClick,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .size(44.dp)
-        ) {
-            Icon(Icons.Default.KeyboardArrowDown, "Minimize", tint = Color.White, modifier = Modifier.size(32.dp))
-        }
-
-        Row(
+        // Contrast scrim
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(48.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.35f),
+                            Color.Black.copy(alpha = 0.75f)
+                        )
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp, vertical = 20.dp)
         ) {
+            // Header Bar (Minimize + Now Playing Title + Options)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, "Minimize", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "PLAYING FROM QUEUE",
+                        color = animatedAccent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = currentSong?.album?.takeIf { it.isNotBlank() } ?: "Muzi Music",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                IconButton(
+                    onClick = { showOptionsDialog = true },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(Icons.Default.MoreVert, "Song Options", tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(48.dp)
+            ) {
             // Left Column (Artwork + Song Info + Controls + Volume)
             Column(
                 modifier = Modifier
@@ -530,6 +592,7 @@ fun PlayerScreen(
             }
         }
     }
+}
 }
 
 @Composable

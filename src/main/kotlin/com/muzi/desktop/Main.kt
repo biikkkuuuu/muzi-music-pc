@@ -20,6 +20,7 @@ import com.muzi.desktop.ui.screens.HomeScreen
 import com.muzi.desktop.ui.screens.LibraryScreen
 import com.muzi.desktop.ui.screens.PlayerScreen
 import com.muzi.desktop.ui.screens.SearchScreen
+import com.muzi.desktop.ui.screens.PlaylistDetailScreen
 import com.muzi.desktop.ui.screens.SettingsScreen
 import com.muzi.desktop.ui.theme.MuziTheme
 import com.muzi.desktop.ui.theme.PureBlack
@@ -29,6 +30,11 @@ fun main() = application {
 
     var currentTab by remember { mutableStateOf(ScreenTab.HOME) }
     var previousTab by remember { mutableStateOf(ScreenTab.HOME) }
+
+    var currentPlaylistId by remember { mutableStateOf<String?>(null) }
+    var currentAlbumId by remember { mutableStateOf<String?>(null) }
+    var currentDetailTitle by remember { mutableStateOf("Playlist") }
+    var currentDetailThumbnail by remember { mutableStateOf<String?>(null) }
 
     Window(
         onCloseRequest = ::exitApplication,
@@ -146,6 +152,19 @@ fun main() = application {
                                         previousTab = ScreenTab.HOME
                                         currentTab = ScreenTab.PLAYER
                                     },
+                                    onPlaylistClick = { id, isAlbum, title, thumb ->
+                                        previousTab = ScreenTab.HOME
+                                        if (isAlbum) {
+                                            currentAlbumId = id
+                                            currentPlaylistId = null
+                                        } else {
+                                            currentPlaylistId = id
+                                            currentAlbumId = null
+                                        }
+                                        currentDetailTitle = title
+                                        currentDetailThumbnail = thumb
+                                        currentTab = ScreenTab.PLAYLIST_DETAIL
+                                    },
                                     onSettingsClick = {
                                         previousTab = currentTab
                                         currentTab = ScreenTab.SETTINGS
@@ -170,6 +189,18 @@ fun main() = application {
                                 ScreenTab.SETTINGS -> SettingsScreen(
                                     onBackClick = {
                                         currentTab = previousTab
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                ScreenTab.PLAYLIST_DETAIL -> PlaylistDetailScreen(
+                                    playlistId = currentPlaylistId,
+                                    albumId = currentAlbumId,
+                                    fallbackTitle = currentDetailTitle,
+                                    fallbackThumbnail = currentDetailThumbnail,
+                                    onBackClick = { currentTab = previousTab },
+                                    onSongClick = { _ ->
+                                        previousTab = ScreenTab.PLAYLIST_DETAIL
+                                        currentTab = ScreenTab.PLAYER
                                     },
                                     modifier = Modifier.fillMaxSize()
                                 )

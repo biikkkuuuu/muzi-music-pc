@@ -124,6 +124,82 @@ object YouTubeMusicService {
         emptyList()
     }
 
+    data class PlaylistDetails(
+        val id: String,
+        val title: String,
+        val author: String,
+        val thumbnailUrl: String?,
+        val songCountText: String,
+        val songs: List<Song>
+    )
+
+    data class AlbumDetails(
+        val id: String,
+        val title: String,
+        val artist: String,
+        val year: String?,
+        val thumbnailUrl: String?,
+        val songs: List<Song>
+    )
+
+    suspend fun getPlaylist(playlistId: String): PlaylistDetails? = withContext(Dispatchers.IO) {
+        try {
+            val page = YouTube.playlist(playlistId).getOrNull() ?: return@withContext null
+            val songs = page.songs.map { item ->
+                Song(
+                    id = item.id,
+                    title = item.title,
+                    artist = item.artists.joinToString(", ") { it.name },
+                    album = item.album?.name ?: page.playlist.title,
+                    durationText = item.duration?.let { "%d:%02d".format(it / 60, it % 60) } ?: "3:30",
+                    durationSeconds = item.duration?.toLong() ?: 210L,
+                    thumbnailUrl = item.thumbnail ?: page.playlist.thumbnail ?: "",
+                    streamUrl = null
+                )
+            }
+            PlaylistDetails(
+                id = page.playlist.id,
+                title = page.playlist.title,
+                author = page.playlist.author?.name ?: "YouTube Music",
+                thumbnailUrl = page.playlist.thumbnail,
+                songCountText = page.playlist.songCountText ?: "${songs.size} songs",
+                songs = songs
+            )
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] Error fetching playlist $playlistId: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun getAlbum(browseId: String): AlbumDetails? = withContext(Dispatchers.IO) {
+        try {
+            val page = YouTube.album(browseId).getOrNull() ?: return@withContext null
+            val songs = page.songs.map { item ->
+                Song(
+                    id = item.id,
+                    title = item.title,
+                    artist = item.artists.joinToString(", ") { it.name },
+                    album = page.album.title,
+                    durationText = item.duration?.let { "%d:%02d".format(it / 60, it % 60) } ?: "3:30",
+                    durationSeconds = item.duration?.toLong() ?: 210L,
+                    thumbnailUrl = item.thumbnail ?: page.album.thumbnail ?: "",
+                    streamUrl = null
+                )
+            }
+            AlbumDetails(
+                id = page.album.id,
+                title = page.album.title,
+                artist = page.album.artists?.joinToString(", ") { it.name } ?: "Various Artists",
+                year = page.album.year?.toString(),
+                thumbnailUrl = page.album.thumbnail,
+                songs = songs
+            )
+        } catch (e: Exception) {
+            println("[YouTubeMusicService] Error fetching album $browseId: ${e.message}")
+            null
+        }
+    }
+
     // Guaranteed Full Length YouTube Stream Playback for Windows PC
     suspend fun resolveStreamUrl(videoId: String): String? = withContext(Dispatchers.IO) {
         // 1. Try ANDROID_NO_SDK (Most reliable for direct unthrottled streams on PC)

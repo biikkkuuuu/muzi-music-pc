@@ -66,8 +66,11 @@ object DesktopAudioPlayer {
     val repeatMode = _repeatMode.asStateFlow()
 
     // Dynamic color extracted from album art
-    private val _dynamicThemeColor = MutableStateFlow(Color(0xFFE50914))
+    private val _dynamicThemeColor = MutableStateFlow(Color(0xFF3B82F6))
     val dynamicThemeColor = _dynamicThemeColor.asStateFlow()
+
+    private val _ambientPalette = MutableStateFlow<List<Color>>(listOf(Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF3B82F6)))
+    val ambientPalette = _ambientPalette.asStateFlow()
 
     // PC Native Audio via Lavaplayer (Exact 44.1kHz Natural Speed & Zero-Lag Seek)
     private val outputFormat = StandardAudioDataFormats.COMMON_PCM_S16_BE
@@ -164,8 +167,9 @@ object DesktopAudioPlayer {
         LibraryManager.addToHistory(song)
 
         scope.launch {
-            val color = DynamicColorExtractor.extractFromUrl(song.thumbnailUrl)
-            _dynamicThemeColor.value = color
+            val palette = DynamicColorExtractor.extractPaletteFromUrl(song.thumbnailUrl)
+            _ambientPalette.value = palette
+            _dynamicThemeColor.value = palette.firstOrNull() ?: DynamicColorExtractor.DefaultMuziColor
         }
 
         // Manage Queue

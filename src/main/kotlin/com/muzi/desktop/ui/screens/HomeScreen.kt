@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onSongClick: (Song) -> Unit,
+    onPlaylistClick: (id: String, isAlbum: Boolean, title: String, thumbnail: String?) -> Unit = { _, _, _, _ -> },
     onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -823,11 +824,17 @@ fun HomeScreen(
                                             .width(150.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .clickable {
-                                                coroutineScope.launch {
-                                                    val searchResults = YouTubeMusicService.search(title)
-                                                    if (searchResults.isNotEmpty()) {
-                                                        DesktopAudioPlayer.playSong(searchResults.first(), searchResults)
-                                                        onSongClick(searchResults.first())
+                                                when (item) {
+                                                    is PlaylistItem -> onPlaylistClick(item.id, false, title, thumb)
+                                                    is AlbumItem -> onPlaylistClick(item.id, true, title, thumb)
+                                                    else -> {
+                                                        coroutineScope.launch {
+                                                            val searchResults = YouTubeMusicService.search(title)
+                                                            if (searchResults.isNotEmpty()) {
+                                                                DesktopAudioPlayer.playSong(searchResults.first(), searchResults)
+                                                                onSongClick(searchResults.first())
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
