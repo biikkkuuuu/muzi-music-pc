@@ -48,6 +48,9 @@ fun MiniPlayerBar(
 
     val progress = if (durationMillis > 0) (positionMillis.toFloat() / durationMillis.toFloat()).coerceIn(0f, 1f) else 0f
 
+    val dynamicColor by DesktopAudioPlayer.dynamicThemeColor.collectAsState()
+    val animatedAccent by androidx.compose.animation.animateColorAsState(dynamicColor, animationSpec = androidx.compose.animation.core.tween(500))
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -81,7 +84,7 @@ fun MiniPlayerBar(
                             style = Stroke(width = 3.dp.toPx())
                         )
                         drawArc(
-                            color = MuziBlue,
+                            color = animatedAccent,
                             startAngle = -90f,
                             sweepAngle = progress * 360f,
                             useCenter = false,
@@ -121,7 +124,7 @@ fun MiniPlayerBar(
                 }
             }
 
-            // Right Controls: Previous | Big Blue Circular Play Button | Next
+            // Right Controls: Previous | Big Dynamic Circular Play Button | Next
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -142,7 +145,7 @@ fun MiniPlayerBar(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
                         .size(44.dp)
-                        .background(MuziBlue, CircleShape)
+                        .background(animatedAccent, CircleShape)
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
