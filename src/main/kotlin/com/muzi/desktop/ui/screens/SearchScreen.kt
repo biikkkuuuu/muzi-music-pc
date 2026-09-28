@@ -362,6 +362,11 @@ fun SearchScreen(
                         onOptionsClick = { selectedSongForOptions = song }
                     )
                 }
+
+                // Bottom space for mini-player
+                item {
+                    Spacer(modifier = Modifier.height(130.dp))
+                }
             }
         }
     }

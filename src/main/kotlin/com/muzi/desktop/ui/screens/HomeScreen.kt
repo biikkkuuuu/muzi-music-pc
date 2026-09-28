@@ -935,5 +935,10 @@ fun HomeScreen(
                 }
             }
         }
+
+        // Bottom space so mini-player doesn't cover content
+        item {
+            Spacer(modifier = Modifier.height(130.dp))
+        }
     }
 }

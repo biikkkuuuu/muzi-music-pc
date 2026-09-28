@@ -72,6 +72,10 @@ object DesktopAudioPlayer {
     private val _ambientPalette = MutableStateFlow<List<Color>>(listOf(Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF3B82F6)))
     val ambientPalette = _ambientPalette.asStateFlow()
 
+    private val _sleepTimerRemainingMillis = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingMillis = _sleepTimerRemainingMillis.asStateFlow()
+    private var sleepTimerJob: Job? = null
+
     // PC Native Audio via Lavaplayer (Exact 44.1kHz Natural Speed & Zero-Lag Seek)
     private val outputFormat = StandardAudioDataFormats.COMMON_PCM_S16_BE
     private val playerManager: DefaultAudioPlayerManager = DefaultAudioPlayerManager().apply {
@@ -407,5 +411,48 @@ object DesktopAudioPlayer {
 
     fun toggleLikeCurrentSong() {
         _currentSong.value?.let { LibraryManager.toggleLike(it) }
+    }
+
+    fun startSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+        val totalMs = minutes * 60 * 1000L
+        _sleepTimerRemainingMillis.value = totalMs
+        sleepTimerJob = scope.launch {
+            var remaining = totalMs
+            while (remaining > 0 && isActive) {
+                delay(1000L)
+                remaining -= 1000L
+                _sleepTimerRemainingMillis.value = remaining
+            }
+            if (isActive) {
+                pause()
+                _sleepTimerRemainingMillis.value = null
+            }
+        }
+    }
+
+    fun startSleepTimerEndOfTrack() {
+        cancelSleepTimer()
+        val remaining = (_durationMillis.value - _currentPositionMillis.value).coerceAtLeast(1000L)
+        _sleepTimerRemainingMillis.value = remaining
+        sleepTimerJob = scope.launch {
+            var rem = remaining
+            while (rem > 0 && isActive) {
+                delay(1000L)
+                rem = (_durationMillis.value - _currentPositionMillis.value).coerceAtLeast(0L)
+                _sleepTimerRemainingMillis.value = rem
+                if (rem <= 1000L) break
+            }
+            if (isActive) {
+                pause()
+                _sleepTimerRemainingMillis.value = null
+            }
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemainingMillis.value = null
     }
 }

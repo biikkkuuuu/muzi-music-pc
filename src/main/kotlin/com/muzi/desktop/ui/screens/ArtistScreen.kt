@@ -326,6 +326,11 @@ fun ArtistScreen(
                         }
                     }
                 }
+
+                // Bottom space for mini-player
+                item {
+                    Spacer(modifier = Modifier.height(130.dp))
+                }
             }
         }
     }
