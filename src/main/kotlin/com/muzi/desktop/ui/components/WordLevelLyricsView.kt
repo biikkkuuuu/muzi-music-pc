@@ -125,26 +125,16 @@ fun KaraokeLyricsView(
                     .padding(horizontal = 16.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (isActive) {
-                    WordLevelCanvasLyrics(
-                        mainText = line.text,
-                        words = words,
-                        currentPositionMs = positionMillis,
-                        isPlaying = isPlaying,
-                        accentColor = accentColor
-                    )
-                } else {
-                    Text(
-                        text = line.text,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                Text(
+                    text = line.text,
+                    style = TextStyle(
+                        fontSize = if (isActive) 26.sp else 22.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                        color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

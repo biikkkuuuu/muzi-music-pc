@@ -116,27 +116,14 @@ fun main() = application {
                     .fillMaxSize()
                     .background(PureBlack)
             ) {
-                // Base Content Layout (Always active beneath the player)
-                Row(modifier = Modifier.fillMaxSize()) {
+                // Base Content Layout (Full screen width with floating side navigation pill overlay)
+                Box(modifier = Modifier.fillMaxSize()) {
                     var showQuickMenu by remember { mutableStateOf(false) }
 
-                    // Left Navigation Rail (Muzi Android style side-nav as a pill)
-                    MuziNavigationRail(
-                        currentTab = if (currentTab == ScreenTab.PLAYER) previousTab else currentTab,
-                        onTabSelected = { 
-                            previousTab = currentTab
-                            currentTab = it 
-                        },
-                        onMoreClick = {
-                            showQuickMenu = true
-                        }
-                    )
-
-                    // Main Screen Area with smooth animated transitions
+                    // Main Screen Area spans 100% full screen width
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
+                            .fillMaxSize()
                     ) {
                         if (showQuickMenu) {
                             com.muzi.desktop.ui.components.QuickMenuDialog(
@@ -324,6 +311,21 @@ fun main() = application {
                                 }
                             }
                         }
+                    }
+
+                    // Floating Left Navigation Pill Rail (Overlays content without shifting/wasting screen space)
+                    if (currentTab != ScreenTab.PLAYER) {
+                        MuziNavigationRail(
+                            currentTab = if (currentTab == ScreenTab.PLAYER) previousTab else currentTab,
+                            onTabSelected = { 
+                                previousTab = currentTab
+                                currentTab = it 
+                            },
+                            onMoreClick = {
+                                showQuickMenu = true
+                            },
+                            modifier = Modifier.align(Alignment.CenterStart)
+                        )
                     }
                 }
 
