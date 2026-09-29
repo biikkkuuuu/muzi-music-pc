@@ -125,16 +125,86 @@ fun KaraokeLyricsView(
                     .padding(horizontal = 16.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = line.text,
-                    style = TextStyle(
-                        fontSize = if (isActive) 26.sp else 22.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                if (isActive) {
+                    // Exact Android Muzi SLIDE/TRAVEL word-by-word karaoke typography
+                    val styledText = buildAnnotatedString {
+                        words.forEachIndexed { wordIndex, word ->
+                            val wordDuration = (word.endMs - word.startMs).coerceAtLeast(1L)
+                            val isWordActive = positionMillis in word.startMs..word.endMs
+                            val hasWordPassed = positionMillis > word.endMs
+
+                            if (isWordActive) {
+                                val timeElapsed = positionMillis - word.startMs
+                                val fillProgress = (timeElapsed.toFloat() / wordDuration.toFloat()).coerceIn(0f, 1f)
+
+                                val slideBrush = Brush.horizontalGradient(
+                                    0.0f to Color.White,
+                                    (fillProgress * 0.92f).coerceIn(0f, 1f) to Color.White,
+                                    fillProgress to Color.White.copy(alpha = 0.95f),
+                                    (fillProgress + 0.05f).coerceIn(0f, 1f) to Color.White.copy(alpha = 0.5f),
+                                    (fillProgress + 0.12f).coerceIn(0f, 1f) to Color.White.copy(alpha = 0.35f),
+                                    1.0f to Color.White.copy(alpha = 0.35f)
+                                )
+
+                                withStyle(
+                                    style = SpanStyle(
+                                        brush = slideBrush,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        shadow = Shadow(
+                                            color = accentColor.copy(alpha = 0.6f * fillProgress),
+                                            offset = Offset.Zero,
+                                            blurRadius = 16f
+                                        )
+                                    )
+                                ) {
+                                    append(word.text)
+                                }
+                            } else if (hasWordPassed) {
+                                withStyle(
+                                    style = SpanStyle(
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        shadow = Shadow(
+                                            color = accentColor.copy(alpha = 0.35f),
+                                            offset = Offset.Zero,
+                                            blurRadius = 10f
+                                        )
+                                    )
+                                ) {
+                                    append(word.text)
+                                }
+                            } else {
+                                withStyle(
+                                    style = SpanStyle(
+                                        color = Color.White.copy(alpha = 0.35f),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                ) {
+                                    append(word.text)
+                                }
+                            }
+                            if (wordIndex < words.size - 1) append(" ")
+                        }
+                    }
+
+                    Text(
+                        text = styledText,
+                        fontSize = 26.sp,
                         textAlign = TextAlign.Center,
-                        color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        lineHeight = 36.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = line.text,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 32.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
