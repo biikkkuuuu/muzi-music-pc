@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.muzi.desktop.ui.theme.*
+import com.muzi.desktop.ui.utils.toMediumThumbnail
 
 /**
  * 100% Android Muzi Parity GridItem
@@ -51,7 +52,7 @@ fun GridItem(
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
-                model = thumbnailUrl,
+                model = thumbnailUrl.toMediumThumbnail(),
                 contentDescription = title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

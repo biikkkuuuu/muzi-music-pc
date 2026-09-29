@@ -32,6 +32,7 @@ import coil3.compose.AsyncImage
 import com.muzi.desktop.audio.DesktopAudioPlayer
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.*
+import com.muzi.desktop.ui.utils.toMediumThumbnail
 
 @Composable
 fun MiniPlayerBar(
@@ -93,7 +94,7 @@ fun MiniPlayerBar(
                     }
 
                     AsyncImage(
-                        model = song.thumbnailUrl,
+                        model = song.thumbnailUrl.toMediumThumbnail(),
                         contentDescription = song.title,
                         modifier = Modifier
                             .size(40.dp)

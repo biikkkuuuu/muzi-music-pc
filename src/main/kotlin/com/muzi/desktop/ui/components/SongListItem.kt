@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.muzi.desktop.model.Song
 import com.muzi.desktop.ui.theme.*
+import com.muzi.desktop.ui.utils.toMediumThumbnail
 
 /**
  * 100% Android Muzi Parity SongListItem
@@ -60,7 +61,7 @@ fun SongListItem(
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
-                model = song.thumbnailUrl,
+                model = song.thumbnailUrl.toMediumThumbnail(),
                 contentDescription = song.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

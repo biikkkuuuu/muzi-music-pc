@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +44,7 @@ import com.muzi.desktop.ui.components.AddToPlaylistDialog
 import com.muzi.desktop.ui.components.AmbientGlowBackground
 import com.muzi.desktop.ui.components.SongOptionsDialog
 import com.muzi.desktop.ui.theme.*
+import com.muzi.desktop.ui.utils.toHighResThumbnail
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -267,7 +269,7 @@ fun PlayerScreen(
                     horizontalAlignment = Alignment.Start,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // Big Album Artwork (Desktop-2.png)
+                    // Big Album Artwork (Desktop-2.png with 1200x1200 Ultra HD quality)
                     Box(
                         modifier = Modifier
                             .size(380.dp)
@@ -277,9 +279,10 @@ fun PlayerScreen(
                     ) {
                         if (currentSong?.thumbnailUrl?.isNotEmpty() == true) {
                             AsyncImage(
-                                model = currentSong?.thumbnailUrl,
+                                model = currentSong?.thumbnailUrl.toHighResThumbnail(),
                                 contentDescription = currentSong?.title,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(
