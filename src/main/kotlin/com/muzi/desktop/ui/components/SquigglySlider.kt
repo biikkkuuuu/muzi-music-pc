@@ -1,8 +1,5 @@
 package com.muzi.desktop.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -16,20 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 /**
- * 100% Exact Android Squiggly / Wavy Seekbar Component for Muzi Music.
- * Animated wave that flows while playing, flattens when paused or dragged,
- * with signature vertical bar rounded thumb indicator.
+ * 100% Android Muzi / Material 3 Straight Line Seekbar with Rounded Pill Thumb.
+ * Ultra smooth drag, tap-to-seek, and crystal clean rendering (Desktop-2.png parity).
  */
 @Composable
 fun SquigglySlider(
@@ -52,59 +42,10 @@ fun SquigglySlider(
     val duration = valueRange.endInclusive - valueRange.start
     val position = currentValue - valueRange.start
 
-    var phaseOffset by remember { mutableFloatStateOf(0f) }
-    var heightFraction by remember { mutableFloatStateOf(if (isPlaying) 1f else 0f) }
-
-    val scope = rememberCoroutineScope()
-
-    val waveLength = 80f
-    val lineAmplitude = 6f
-    val phaseSpeed = 24f
-    val transitionPeriods = 1.5f
-    val minWaveEndpoint = 0f
-    val matchedWaveEndpoint = 1f
-    val transitionEnabled = true
-
-    LaunchedEffect(isPlaying, isDragging) {
-        scope.launch {
-            val shouldFlatten = !isPlaying || isDragging
-            val targetHeight = if (shouldFlatten) 0f else 1f
-            val animDuration = if (shouldFlatten) 150 else 200
-            val startDelay = if (shouldFlatten) 0L else 30L
-
-            delay(startDelay)
-
-            val animator = Animatable(heightFraction)
-            animator.animateTo(
-                targetValue = targetHeight,
-                animationSpec = tween(
-                    durationMillis = animDuration,
-                    easing = LinearEasing,
-                ),
-            ) {
-                heightFraction = this.value
-            }
-        }
-    }
-
-    LaunchedEffect(isPlaying) {
-        if (!isPlaying) return@LaunchedEffect
-
-        var lastFrameTime = withFrameMillis { it }
-        while (isActive) {
-            withFrameMillis { frameTimeMillis ->
-                val deltaTime = (frameTimeMillis - lastFrameTime) / 1000f
-                phaseOffset += deltaTime * phaseSpeed
-                phaseOffset %= waveLength
-                lastFrameTime = frameTimeMillis
-            }
-        }
-    }
-
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp)
+            .height(36.dp)
             .then(
                 if (enabled) {
                     Modifier
@@ -148,132 +89,48 @@ fun SquigglySlider(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(36.dp)
         ) {
-            val strokeWidth = 5.dp.toPx()
+            val strokeWidth = 3.5.dp.toPx()
             val progress = if (duration > 0f) (position / duration).coerceIn(0f, 1f) else 0f
             val totalWidth = size.width
-            val totalProgressPx = totalWidth * progress
+            val totalProgressPx = (totalWidth * progress).coerceIn(0f, totalWidth)
             val centerY = size.height / 2f
 
-            val waveProgressPx = if (!transitionEnabled || progress > matchedWaveEndpoint) {
-                totalWidth * progress
-            } else {
-                val t = (progress / matchedWaveEndpoint).coerceIn(0f, 1f)
-                totalWidth * (minWaveEndpoint + (matchedWaveEndpoint - minWaveEndpoint) * t)
-            }
+            val disabledAlpha = 0.25f
+            val inactiveTrackColor = if (inactiveColor != Color.Unspecified) inactiveColor else primaryColor.copy(alpha = disabledAlpha)
 
-            fun computeAmplitude(x: Float, sign: Float): Float {
-                return if (transitionEnabled) {
-                    val length = transitionPeriods * waveLength
-                    val coeff = ((waveProgressPx + length / 2f - x) / length).coerceIn(0f, 1f)
-                    sign * heightFraction * lineAmplitude * coeff
-                } else {
-                    sign * heightFraction * lineAmplitude
-                }
-            }
-
-            val path = Path()
-            val waveStart = -phaseOffset - waveLength / 2f
-            val waveEnd = if (transitionEnabled) totalWidth else waveProgressPx
-
-            path.moveTo(waveStart, centerY)
-
-            var currentX = waveStart
-            var waveSign = 1f
-            var currentAmp = computeAmplitude(currentX, waveSign)
-            val dist = waveLength / 2f
-
-            while (currentX < waveEnd) {
-                waveSign = -waveSign
-                val nextX = currentX + dist
-                val midX = currentX + dist / 2f
-                val nextAmp = computeAmplitude(nextX, waveSign)
-
-                path.cubicTo(
-                    midX,
-                    centerY + currentAmp,
-                    midX,
-                    centerY + nextAmp,
-                    nextX,
-                    centerY + nextAmp,
-                )
-
-                currentAmp = nextAmp
-                currentX = nextX
-            }
-
-            val clipTop = lineAmplitude + strokeWidth
-            val disabledAlpha = 77f / 255f
-            val inactiveTrackColor = primaryColor.copy(alpha = disabledAlpha)
-            val capRadius = strokeWidth / 2f
-
-            fun drawPathSegment(startX: Float, endX: Float, color: Color) {
-                if (endX <= startX) return
-                clipRect(
-                    left = startX,
-                    top = centerY - clipTop,
-                    right = endX,
-                    bottom = centerY + clipTop,
-                ) {
-                    drawPath(
-                        path = path,
-                        color = color,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                    )
-                }
-            }
-
-            drawPathSegment(0f, totalProgressPx, primaryColor)
-            drawPathSegment(totalProgressPx, totalWidth, inactiveTrackColor)
-
-            fun getWaveY(x: Float): Float {
-                val phase = (x - waveStart) / waveLength
-                val waveCycle = phase - kotlin.math.floor(phase)
-                val waveValue = kotlin.math.cos(waveCycle * 2f * kotlin.math.PI.toFloat())
-
-                val ampCoeff = if (transitionEnabled) {
-                    val length = transitionPeriods * waveLength
-                    ((waveProgressPx + length / 2f - x) / length).coerceIn(0f, 1f)
-                } else {
-                    1f
-                }
-
-                return centerY + waveValue * lineAmplitude * heightFraction * ampCoeff
-            }
-
-            drawCircle(
-                color = primaryColor,
-                radius = capRadius,
-                center = Offset(0f, getWaveY(0f)),
+            // Inactive track (background line)
+            drawLine(
+                color = inactiveTrackColor,
+                start = Offset(0f, centerY),
+                end = Offset(totalWidth, centerY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
             )
 
-            val endWaveY = getWaveY(totalWidth)
-            clipRect(
-                left = totalWidth,
-                top = centerY - clipTop,
-                right = totalWidth + capRadius,
-                bottom = centerY + clipTop,
-            ) {
-                drawCircle(
-                    color = inactiveTrackColor,
-                    radius = capRadius,
-                    center = Offset(totalWidth, endWaveY),
-                )
-            }
-
-            val barHalfHeight = (lineAmplitude + strokeWidth)
-            val barWidth = 5.dp.toPx()
-
-            if (barHalfHeight > 0.5f) {
+            // Active track (played progress line)
+            if (totalProgressPx > 0f) {
                 drawLine(
                     color = primaryColor,
-                    start = Offset(totalProgressPx, centerY - barHalfHeight),
-                    end = Offset(totalProgressPx, centerY + barHalfHeight),
-                    strokeWidth = barWidth,
-                    cap = StrokeCap.Round,
+                    start = Offset(0f, centerY),
+                    end = Offset(totalProgressPx, centerY),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
                 )
             }
+
+            // Signature Android / Material 3 Pill Thumb
+            val thumbHalfHeight = 7.dp.toPx()
+            val thumbWidth = 4.5.dp.toPx()
+
+            drawLine(
+                color = primaryColor,
+                start = Offset(totalProgressPx, centerY - thumbHalfHeight),
+                end = Offset(totalProgressPx, centerY + thumbHalfHeight),
+                strokeWidth = thumbWidth,
+                cap = StrokeCap.Round
+            )
         }
     }
 }
